@@ -74,6 +74,10 @@
             <option value="ict_index" {% if filters.sort == "ict_index" %}selected{% endif %}>ICT index</option>
             <option value="points_per_game" {% if filters.sort == "points_per_game" %}selected{% endif %}>Points per game</option>
             <option value="transfers_in_gameweek" {% if filters.sort == "transfers_in_gameweek" %}selected{% endif %}>GW transfers in</option>
+            <option value="expert_score" {% if filters.sort == "expert_score" %}selected{% endif %}>Expert Score</option>
+            <option value="current_form_score" {% if filters.sort == "current_form_score" %}selected{% endif %}>Current Form Score</option>
+            <option value="future_fpl_score" {% if filters.sort == "future_fpl_score" %}selected{% endif %}>Future FPL Score</option>
+            <option value="value_score" {% if filters.sort == "value_score" %}selected{% endif %}>Value Score</option>
           </select>
         </div>
 
@@ -109,10 +113,10 @@
                   <th scope="col">Player</th>
                   <th scope="col">Team</th>
                   <th scope="col">Position</th>
-                  <th scope="col">Expert</th>
-                  <th scope="col">Form score</th>
-                  <th scope="col">Future score</th>
-                  <th scope="col">Value score</th>
+                  <th scope="col">Expert Score /100</th>
+                  <th scope="col">Current Form Score /100</th>
+                  <th scope="col">Future FPL Score /100</th>
+                  <th scope="col">Value Score /100</th>
                   <th scope="col">Rating</th>
                   <th scope="col">Status</th>
                   <th scope="col">Chance</th>
@@ -156,10 +160,10 @@
                       <span class="team-full">{{ player.team_name|display }}</span>
                     </td>
                     <td data-label="Position">{{ player.position_short_name or player.position_name|display }}</td>
-                    <td data-label="Expert" class="rating-number">{{ player.expert_score|decimal(1) }}</td>
-                    <td data-label="Form score">{{ player.current_form_score|decimal(1) }}</td>
-                    <td data-label="Future score">{{ player.future_fpl_score|decimal(1) }}</td>
-                    <td data-label="Value score">{{ player.value_score|decimal(1) }}</td>
+                    <td data-label="Expert Score /100" class="rating-number">{{ player.expert_score|decimal(1) }}</td>
+                    <td data-label="Current Form Score /100">{{ player.current_form_score|decimal(1) }}</td>
+                    <td data-label="Future FPL Score /100">{{ player.future_fpl_score|decimal(1) }}</td>
+                    <td data-label="Value Score /100">{{ player.value_score|decimal(1) }}</td>
                     <td data-label="Rating"><span class="rating-label">{{ player.rating_label|display }}</span></td>
                     <td data-label="Status">{{ player.status_label|display }}</td>
                     <td data-label="Chance">{{ player.chance_of_playing_next_round|percent }}</td>
