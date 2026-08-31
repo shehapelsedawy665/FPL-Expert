@@ -1,15 +1,19 @@
+import logging
 from typing import Any
+
+
+logger = logging.getLogger(__name__)
 
 
 VALID_FORMATIONS = (
     (3, 4, 3),
     (3, 5, 2),
-    (4, 4, 2),
     (4, 3, 3),
+    (4, 4, 2),
     (4, 5, 1),
+    (5, 2, 3),
     (5, 3, 2),
     (5, 4, 1),
-    (5, 2, 3),
 )
 
 POSITION_NAMES = {
@@ -34,6 +38,30 @@ def _quality_key(player: dict[str, Any]) -> tuple[float, float, float, float]:
         number_value(player.get("minutes_security")),
         number_value(player.get("current_form_score")),
     )
+
+
+def _has_clear_availability_problem(player: dict[str, Any]) -> bool:
+    """Return whether official FPL fields flag a clear next-GW issue."""
+    status = str(player.get("status", ""))
+    if status in {"i", "n", "s", "u"}:
+        return True
+    chance = player.get("chance_of_playing_next_round")
+    if chance is not None and number_value(chance) < 75:
+        return True
+    return status == "d" and chance is None
+
+
+def _availability_reasons(player: dict[str, Any]) -> list[str]:
+    reasons = []
+    status = str(player.get("status", ""))
+    if status in {"i", "n", "s", "u"}:
+        reasons.append(player.get("status_label") or "Unavailable")
+    elif status == "d":
+        reasons.append("Doubtful availability")
+    chance = player.get("chance_of_playing_next_round")
+    if chance is not None and number_value(chance) < 75:
+        reasons.append(f"{number_value(chance):.0f}% chance of playing")
+    return reasons
 
 
 def _playing_security_key(
@@ -125,75 +153,169 @@ def group_squad(squad: list[dict[str, Any]]) -> list[dict[str, Any]]:
     ]
 
 
-def _formation_score(
+def _players_for_formation(
     formation: tuple[int, int, int],
     players_by_position: dict[int, list[dict[str, Any]]],
-) -> float:
+) -> list[dict[str, Any]] | None:
     goalkeeper = players_by_position.get(1, [])
     defenders = players_by_position.get(2, [])
     midfielders = players_by_position.get(3, [])
     forwards = players_by_position.get(4, [])
     defender_count, midfielder_count, forward_count = formation
     if not goalkeeper or len(defenders) < defender_count:
-        return -1
+        return None
     if len(midfielders) < midfielder_count or len(forwards) < forward_count:
+        return None
+    selected = []
+    for players, count in (
+        (goalkeeper, 1),
+        (defenders, defender_count),
+        (midfielders, midfielder_count),
+        (forwards, forward_count),
+    ):
+        selected.extend(sorted(players, key=_quality_key, reverse=True)[:count])
+    return selected
+
+
+def _formation_score(
+    formation: tuple[int, int, int],
+    players_by_position: dict[int, list[dict[str, Any]]],
+) -> float:
+    selected = _players_for_formation(formation, players_by_position)
+    if selected is None:
         return -1
-    return sum(
-        number_value(player.get("expert_score"))
-        for players, count in (
-            (goalkeeper, 1),
-            (defenders, defender_count),
-            (midfielders, midfielder_count),
-            (forwards, forward_count),
+    return sum(number_value(player.get("expert_score")) for player in selected)
+
+
+def _is_legal_xi(
+    players: list[dict[str, Any]],
+    formation: tuple[int, int, int],
+) -> bool:
+    if len(players) != 11:
+        return False
+    counts = {
+        position_id: sum(
+            player.get("element_type") == position_id for player in players
         )
-        for player in sorted(players, key=_quality_key, reverse=True)[:count]
+        for position_id in (1, 2, 3, 4)
+    }
+    return (
+        counts[1] == 1
+        and counts[2] == formation[0]
+        and counts[3] == formation[1]
+        and counts[4] == formation[2]
+        and 3 <= counts[2] <= 5
+        and 2 <= counts[3] <= 5
+        and 1 <= counts[4] <= 3
     )
+
+
+def _position_index(players: list[dict[str, Any]]) -> dict[int, list[dict[str, Any]]]:
+    return {
+        position_id: [
+            player
+            for player in players
+            if player.get("element_type") == position_id
+        ]
+        for position_id in (1, 2, 3, 4)
+    }
+
+
+def _formation_diagnostics(
+    players_by_position: dict[int, list[dict[str, Any]]],
+    *,
+    availability_fallback: bool = False,
+) -> list[dict[str, Any]]:
+    diagnostics = []
+    for formation in VALID_FORMATIONS:
+        selected = _players_for_formation(formation, players_by_position)
+        is_legal = selected is not None and _is_legal_xi(selected, formation)
+        selected = selected or []
+        score = (
+            round(sum(number_value(player.get("expert_score")) for player in selected), 1)
+            if is_legal
+            else None
+        )
+        diagnostic = {
+            "formation": f"{formation[0]}-{formation[1]}-{formation[2]}",
+            "formation_tuple": formation,
+            "selected_players": [
+                player.get("web_name") or str(player.get("id"))
+                for player in selected
+            ],
+            "selected_player_ids": [player.get("id") for player in selected],
+            "selected_count": len(selected),
+            "total_expert_score": score,
+            "is_legal": is_legal,
+            "availability_fallback": availability_fallback,
+            "availability_issues": [
+                reason
+                for player in selected
+                for reason in _availability_reasons(player)
+            ],
+        }
+        diagnostics.append(diagnostic)
+        logger.debug(
+            "Starting XI formation=%s selected=%s total_expert_score=%s "
+            "legal=%s availability_fallback=%s",
+            diagnostic["formation"],
+            ", ".join(diagnostic["selected_players"]),
+            diagnostic["total_expert_score"],
+            diagnostic["is_legal"],
+            availability_fallback,
+        )
+    return diagnostics
 
 
 def get_recommended_xi(squad: list[dict[str, Any]]) -> dict[str, Any]:
     available = [player for player in squad if not player.get("missing_data")]
-    players_by_position = {
-        position_id: [
-            player for player in available if player.get("element_type") == position_id
-        ]
-        for position_id in (1, 2, 3, 4)
-    }
-    legal_formations = [
-        formation
-        for formation in VALID_FORMATIONS
-        if _formation_score(formation, players_by_position) >= 0
+    eligible = [
+        player for player in available if not _has_clear_availability_problem(player)
     ]
-    if not legal_formations:
-        return {"players": [], "formation": None, "formation_label": "Unavailable"}
+    players_by_position = _position_index(eligible)
+    diagnostics = _formation_diagnostics(players_by_position)
+    legal_formations = [
+        diagnostic for diagnostic in diagnostics if diagnostic["is_legal"]
+    ]
+    availability_fallback = False
 
-    formation = max(
-        legal_formations,
-        key=lambda item: (_formation_score(item, players_by_position), item),
-    )
-    goalkeeper_count, defender_count, midfielder_count, forward_count = (
-        1,
-        formation[0],
-        formation[1],
-        formation[2],
-    )
-    selected = []
-    for position_id, count in (
-        (1, goalkeeper_count),
-        (2, defender_count),
-        (3, midfielder_count),
-        (4, forward_count),
-    ):
-        selected.extend(
-            sorted(
-                players_by_position.get(position_id, []),
-                key=_quality_key,
-                reverse=True,
-            )[:count]
+    if not legal_formations:
+        # A lineup is still useful when a squad has too many unavailable players
+        # in one position. This path only uses a flagged player when no legal
+        # availability-eligible XI can be formed at all.
+        players_by_position = _position_index(available)
+        diagnostics = _formation_diagnostics(
+            players_by_position, availability_fallback=True
         )
+        legal_formations = [
+            diagnostic for diagnostic in diagnostics if diagnostic["is_legal"]
+        ]
+        availability_fallback = True
+
+    if not legal_formations:
+        return {
+            "players": [],
+            "formation": None,
+            "formation_label": "Unavailable",
+            "formation_diagnostics": diagnostics,
+            "availability_fallback": availability_fallback,
+        }
+
+    winning_diagnostic = max(
+        legal_formations,
+        key=lambda diagnostic: (
+            number_value(diagnostic["total_expert_score"]),
+            -VALID_FORMATIONS.index(diagnostic["formation_tuple"]),
+        ),
+    )
+    formation = winning_diagnostic["formation_tuple"]
+    selected = _players_for_formation(formation, players_by_position) or []
     return {
         "players": selected,
         "formation": formation,
         "formation_label": f"{formation[0]}-{formation[1]}-{formation[2]}",
+        "formation_diagnostics": diagnostics,
+        "availability_fallback": availability_fallback,
     }
 
 

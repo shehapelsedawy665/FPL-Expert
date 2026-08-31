@@ -1,0 +1,92 @@
+We will improve the FPL Expert app step by step.
+
+For this task ONLY, audit and improve the Recommended Starting XI logic.
+
+Do NOT work on:
+- transfers
+- captaincy
+- bench ordering
+- Attention Required
+- Expert Score formula
+- player/team mappings
+- UI redesign
+
+Keep everything else unchanged.
+
+GOAL:
+The Recommended Starting XI must select the best possible legal FPL XI from the user's current 15-player squad.
+
+Requirements:
+
+1. Evaluate all valid FPL formations:
+- 3-4-3
+- 3-5-2
+- 4-3-3
+- 4-4-2
+- 4-5-1
+- 5-2-3
+- 5-3-2
+- 5-4-1
+
+2. Every candidate XI must contain:
+- exactly 1 goalkeeper
+- 3 to 5 defenders
+- 2 to 5 midfielders
+- 1 to 3 forwards
+- exactly 11 players
+
+3. For each legal formation, construct the strongest possible XI from the CURRENT SQUAD.
+
+4. Use the existing player evaluation data already available in the app.
+
+For now, use Expert Score as the primary ranking metric.
+
+Do NOT invent a new scoring formula in this task.
+
+5. Players with a clear next-gameweek availability problem should not be preferred over healthy alternatives solely because of a slightly higher Expert Score.
+
+Use existing official availability fields where available.
+
+6. Calculate the total Expert Score of every candidate formation.
+
+Choose the legal formation/XI with the highest total score after availability eligibility is considered.
+
+7. Do not simply sort all players and force them into the first legal formation.
+
+Actually compare all legal formations.
+
+8. Keep the existing Recommended Starting XI UI.
+
+9. Add development diagnostics showing:
+
+formation
+selected 11 players
+total XI Expert Score
+
+for every formation evaluated.
+
+This can be console/debug output and does not need to appear in the normal UI.
+
+10. Add tests verifying:
+
+- exactly 11 starters
+- exactly 1 GKP
+- DEF between 3 and 5
+- MID between 2 and 5
+- FWD between 1 and 3
+- selected formation is legal
+- selected XI is the highest-scoring legal XI from the supplied squad
+
+After implementing it, report:
+
+1. How the old lineup algorithm worked.
+2. What you changed.
+3. Every formation evaluated for my currently imported squad.
+4. Total Expert Score for each formation.
+5. Which formation won and why.
+6. The resulting Starting XI.
+7. Test results.
+
+Then STOP and wait for my next instruction.
+
+Do not implement anything else.
