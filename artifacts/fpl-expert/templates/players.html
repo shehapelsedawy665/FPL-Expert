@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Live Fantasy Premier League player data from the official FPL bootstrap-static feed."
+    />
+    <title>Players · FPL Expert</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="players-page">
+      <header class="players-header">
+        <a class="brand-link" href="{{ url_for('home') }}">FPL Expert</a>
+        <div>
+          <div class="eyebrow">LIVE FPL DATA</div>
+          <h1>Players</h1>
+          <p class="page-intro">
+            Current player stats from the Fantasy Premier League bootstrap feed.
+          </p>
+        </div>
+      </header>
+
+      <form class="filters" method="get" action="{{ url_for('players') }}">
+        <div class="filter-field filter-name">
+          <label for="name">Player name</label>
+          <input
+            id="name"
+            name="name"
+            type="search"
+            value="{{ filters.name }}"
+            placeholder="Search players"
+          />
+        </div>
+
+        <div class="filter-field">
+          <label for="team">Team</label>
+          <select id="team" name="team">
+            <option value="">All teams</option>
+            {% for team in teams|sort(attribute="name") %}
+              <option value="{{ team.id }}" {% if filters.team == team.id|string %}selected{% endif %}>
+                {{ team.name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label for="position">Position</label>
+          <select id="position" name="position">
+            <option value="">All positions</option>
+            {% for position in positions|sort(attribute="id") %}
+              <option value="{{ position.id }}" {% if filters.position == position.id|string %}selected{% endif %}>
+                {{ position.singular_name }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="filter-field">
+          <label for="sort">Rank by</label>
+          <select id="sort" name="sort">
+            <option value="total_points" {% if filters.sort == "total_points" %}selected{% endif %}>Total points</option>
+            <option value="now_cost" {% if filters.sort == "now_cost" %}selected{% endif %}>Price</option>
+            <option value="form" {% if filters.sort == "form" %}selected{% endif %}>Form</option>
+            <option value="goals_scored" {% if filters.sort == "goals_scored" %}selected{% endif %}>Goals</option>
+            <option value="assists" {% if filters.sort == "assists" %}selected{% endif %}>Assists</option>
+            <option value="bonus" {% if filters.sort == "bonus" %}selected{% endif %}>Bonus</option>
+            <option value="selected_by_percent" {% if filters.sort == "selected_by_percent" %}selected{% endif %}>Ownership</option>
+          </select>
+        </div>
+
+        <div class="filter-field filter-order">
+          <label for="order">Order</label>
+          <select id="order" name="order">
+            <option value="desc" {% if filters.order == "desc" %}selected{% endif %}>Highest first</option>
+            <option value="asc" {% if filters.order == "asc" %}selected{% endif %}>Lowest first</option>
+          </select>
+        </div>
+
+        <button class="filter-button" type="submit">Apply filters</button>
+        <a class="reset-link" href="{{ url_for('players') }}">Reset</a>
+      </form>
+
+      {% if error %}
+        <section class="status-panel error-panel" role="alert">
+          <strong>Live FPL data is temporarily unavailable.</strong>
+          <p>{{ error }} Please try again in a moment.</p>
+          <a class="retry-link" href="{{ url_for('players') }}">Retry</a>
+        </section>
+      {% else %}
+        <div class="results-summary">
+          <span><strong>{{ players|length }}</strong> players shown</span>
+          <span class="live-indicator"><span aria-hidden="true"></span>Live from FPL</span>
+        </div>
+
+        {% if players %}
+          <div class="table-wrap">
+            <table class="players-table">
+              <thead>
+                <tr>
+                  <th scope="col">Player</th>
+                  <th scope="col">Team</th>
+                  <th scope="col">Position</th>
+                  <th scope="col">Price</th>
+                  <th scope="col">Total</th>
+                  <th scope="col">GW</th>
+                  <th scope="col">Minutes</th>
+                  <th scope="col">Goals</th>
+                  <th scope="col">Assists</th>
+                  <th scope="col">Clean sheets</th>
+                  <th scope="col">Bonus</th>
+                  <th scope="col">Form</th>
+                  <th scope="col">Owned</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for player in players %}
+                  <tr>
+                    <th scope="row" data-label="Player">
+                      <span class="player-name">{{ player.web_name }}</span>
+                      <span class="player-full-name">{{ player.first_name }} {{ player.second_name }}</span>
+                    </th>
+                    <td data-label="Team">
+                      <span class="team-short">{{ player.team_short_name }}</span>
+                      <span class="team-full">{{ player.team_name }}</span>
+                    </td>
+                    <td data-label="Position">{{ player.position_short_name or player.position_name }}</td>
+                    <td data-label="Price">£{{ "%.1f"|format(player.now_cost / 10) }}</td>
+                    <td data-label="Total" class="stat-emphasis">{{ player.total_points }}</td>
+                    <td data-label="GW">{{ player.event_points }}</td>
+                    <td data-label="Minutes">{{ player.minutes }}</td>
+                    <td data-label="Goals">{{ player.goals_scored }}</td>
+                    <td data-label="Assists">{{ player.assists }}</td>
+                    <td data-label="Clean sheets">{{ player.clean_sheets }}</td>
+                    <td data-label="Bonus">{{ player.bonus }}</td>
+                    <td data-label="Form">{{ player.form }}</td>
+                    <td data-label="Owned">{{ player.selected_by_percent }}%</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <section class="status-panel">
+            <strong>No players match those filters.</strong>
+            <p>Try broadening the player, team, or position filters.</p>
+          </section>
+        {% endif %}
+      {% endif %}
+    </main>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
