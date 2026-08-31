@@ -18,7 +18,7 @@
           <div class="eyebrow">LIVE FPL DATA</div>
           <h1>Players</h1>
           <p class="page-intro">
-            Current player stats from the Fantasy Premier League bootstrap feed.
+            Current player stats and upcoming fixture difficulty from FPL.
           </p>
         </div>
       </header>
@@ -69,6 +69,11 @@
             <option value="assists" {% if filters.sort == "assists" %}selected{% endif %}>Assists</option>
             <option value="bonus" {% if filters.sort == "bonus" %}selected{% endif %}>Bonus</option>
             <option value="selected_by_percent" {% if filters.sort == "selected_by_percent" %}selected{% endif %}>Ownership</option>
+            <option value="expected_goals" {% if filters.sort == "expected_goals" %}selected{% endif %}>xG</option>
+            <option value="expected_assists" {% if filters.sort == "expected_assists" %}selected{% endif %}>xA</option>
+            <option value="ict_index" {% if filters.sort == "ict_index" %}selected{% endif %}>ICT index</option>
+            <option value="points_per_game" {% if filters.sort == "points_per_game" %}selected{% endif %}>Points per game</option>
+            <option value="transfers_in_gameweek" {% if filters.sort == "transfers_in_gameweek" %}selected{% endif %}>GW transfers in</option>
           </select>
         </div>
 
@@ -104,6 +109,8 @@
                   <th scope="col">Player</th>
                   <th scope="col">Team</th>
                   <th scope="col">Position</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Chance</th>
                   <th scope="col">Price</th>
                   <th scope="col">Total</th>
                   <th scope="col">GW</th>
@@ -114,30 +121,72 @@
                   <th scope="col">Bonus</th>
                   <th scope="col">Form</th>
                   <th scope="col">Owned</th>
+                  <th scope="col">xG</th>
+                  <th scope="col">xA</th>
+                  <th scope="col">xGI</th>
+                  <th scope="col">xGC</th>
+                  <th scope="col">Influence</th>
+                  <th scope="col">Creativity</th>
+                  <th scope="col">Threat</th>
+                  <th scope="col">ICT</th>
+                  <th scope="col">PPG</th>
+                  <th scope="col">Transfers in</th>
+                  <th scope="col">Transfers out</th>
+                  <th scope="col">GW in</th>
+                  <th scope="col">GW out</th>
+                  <th scope="col">Next 5</th>
+                  <th scope="col">Next 3 avg</th>
+                  <th scope="col">Next 5 avg</th>
                 </tr>
               </thead>
               <tbody>
                 {% for player in players %}
                   <tr>
                     <th scope="row" data-label="Player">
-                      <span class="player-name">{{ player.web_name }}</span>
-                      <span class="player-full-name">{{ player.first_name }} {{ player.second_name }}</span>
+                      <a class="player-name player-link" href="{{ url_for('player_detail', player_id=player.id) }}">{{ player.web_name|display }}</a>
+                      <span class="player-full-name">{{ player.first_name|display }} {{ player.second_name|display }}</span>
                     </th>
                     <td data-label="Team">
-                      <span class="team-short">{{ player.team_short_name }}</span>
-                      <span class="team-full">{{ player.team_name }}</span>
+                      <span class="team-short">{{ player.team_short_name|display }}</span>
+                      <span class="team-full">{{ player.team_name|display }}</span>
                     </td>
-                    <td data-label="Position">{{ player.position_short_name or player.position_name }}</td>
-                    <td data-label="Price">£{{ "%.1f"|format(player.now_cost / 10) }}</td>
-                    <td data-label="Total" class="stat-emphasis">{{ player.total_points }}</td>
-                    <td data-label="GW">{{ player.event_points }}</td>
-                    <td data-label="Minutes">{{ player.minutes }}</td>
-                    <td data-label="Goals">{{ player.goals_scored }}</td>
-                    <td data-label="Assists">{{ player.assists }}</td>
-                    <td data-label="Clean sheets">{{ player.clean_sheets }}</td>
-                    <td data-label="Bonus">{{ player.bonus }}</td>
-                    <td data-label="Form">{{ player.form }}</td>
-                    <td data-label="Owned">{{ player.selected_by_percent }}%</td>
+                    <td data-label="Position">{{ player.position_short_name or player.position_name|display }}</td>
+                    <td data-label="Status">{{ player.status_label|display }}</td>
+                    <td data-label="Chance">{{ player.chance_of_playing_next_round|percent }}</td>
+                    <td data-label="Price">{{ player.now_cost|price }}</td>
+                    <td data-label="Total" class="stat-emphasis">{{ player.total_points|display }}</td>
+                    <td data-label="GW">{{ player.event_points|display }}</td>
+                    <td data-label="Minutes">{{ player.minutes|display }}</td>
+                    <td data-label="Goals">{{ player.goals_scored|display }}</td>
+                    <td data-label="Assists">{{ player.assists|display }}</td>
+                    <td data-label="Clean sheets">{{ player.clean_sheets|display }}</td>
+                    <td data-label="Bonus">{{ player.bonus|display }}</td>
+                    <td data-label="Form">{{ player.form|display }}</td>
+                    <td data-label="Owned">{{ player.selected_by_percent|percent }}</td>
+                    <td data-label="xG">{{ player.expected_goals|decimal(2) }}</td>
+                    <td data-label="xA">{{ player.expected_assists|decimal(2) }}</td>
+                    <td data-label="xGI">{{ player.expected_goal_involvements|decimal(2) }}</td>
+                    <td data-label="xGC">{{ player.expected_goals_conceded|decimal(2) }}</td>
+                    <td data-label="Influence">{{ player.influence|decimal(1) }}</td>
+                    <td data-label="Creativity">{{ player.creativity|decimal(1) }}</td>
+                    <td data-label="Threat">{{ player.threat|decimal(1) }}</td>
+                    <td data-label="ICT">{{ player.ict_index|decimal(1) }}</td>
+                    <td data-label="PPG">{{ player.points_per_game|decimal(1) }}</td>
+                    <td data-label="Transfers in">{{ player.transfers_in|display }}</td>
+                    <td data-label="Transfers out">{{ player.transfers_out|display }}</td>
+                    <td data-label="GW in">{{ player.transfers_in_gameweek|display }}</td>
+                    <td data-label="GW out">{{ player.transfers_out_gameweek|display }}</td>
+                    <td data-label="Next 5" class="fixture-list">
+                      {% for fixture in player.next_5_fixtures %}
+                        <span class="fixture-chip" title="{{ fixture.opponent|display }} · {{ fixture.kickoff_display|display }}">
+                          {{ fixture.opponent_short_name|display }} <small>{{ fixture.venue }} · {{ fixture.difficulty|display }}</small>
+                        </span>
+                      {% else %}
+                        <span>—</span>
+                      {% endfor %}
+                    </td>
+                    <td data-label="Next 3 avg">{{ player.next_3_avg_difficulty|decimal(2) }}</td>
+                    <td data-label="Next 5 avg">{{ player.next_5_avg_difficulty|decimal(2) }}</td>
                   </tr>
                 {% endfor %}
               </tbody>

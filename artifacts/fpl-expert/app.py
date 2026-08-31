@@ -1,14 +1,51 @@
 import os
 
 from flask import Flask, render_template, request
+from werkzeug.exceptions import NotFound
 
 from services.fpl_service import (
     FPLDataError,
+    add_fixture_data,
+    add_history_team_names,
     filter_and_sort_players,
     fetch_bootstrap_data,
+    fetch_fixtures,
+    fetch_player_summary,
 )
 
 app = Flask(__name__)
+
+
+@app.template_filter("display")
+def display(value):
+    return "—" if value is None or value == "" else value
+
+
+@app.template_filter("decimal")
+def decimal(value, places=1):
+    if value is None or value == "":
+        return "—"
+    try:
+        return f"{float(value):.{int(places)}f}"
+    except (TypeError, ValueError):
+        return value
+
+
+@app.template_filter("price")
+def price(value):
+    if value is None or value == "":
+        return "—"
+    try:
+        return f"£{float(value) / 10:.1f}"
+    except (TypeError, ValueError):
+        return "—"
+
+
+@app.template_filter("percent")
+def percent(value):
+    if value is None or value == "":
+        return "—"
+    return f"{value}%"
 
 
 @app.get("/")
@@ -26,8 +63,15 @@ def players():
 
     try:
         bootstrap = fetch_bootstrap_data()
-        filtered_players = filter_and_sort_players(
+        fixtures = fetch_fixtures()
+        enriched_players = add_fixture_data(
             bootstrap.players,
+            fixtures,
+            bootstrap.teams,
+            bootstrap.reference_gameweek,
+        )
+        filtered_players = filter_and_sort_players(
+            enriched_players,
             name=name,
             team=team,
             position=position,
@@ -61,6 +105,52 @@ def players():
                 "sort": sort_by,
                 "order": order,
             },
+            error=str(error),
+        ), 502
+
+
+@app.get("/player/<int:player_id>")
+def player_detail(player_id: int):
+    try:
+        bootstrap = fetch_bootstrap_data()
+        player = next(
+            (player for player in bootstrap.players if player.get("id") == player_id),
+            None,
+        )
+        if player is None:
+            raise NotFound
+
+        fixtures = fetch_fixtures()
+        player_with_fixtures = add_fixture_data(
+            [player],
+            fixtures,
+            bootstrap.teams,
+            bootstrap.reference_gameweek,
+        )[0]
+        summary = fetch_player_summary(player_id)
+        history = [
+            item for item in summary.get("history", []) if isinstance(item, dict)
+        ]
+        history = add_history_team_names(history, bootstrap.teams)
+        history.sort(key=lambda item: item.get("round") or 0, reverse=True)
+        return render_template(
+            "player_detail.html",
+            player=player_with_fixtures,
+            history=history,
+            error=None,
+        )
+    except NotFound:
+        return render_template(
+            "player_detail.html",
+            player=None,
+            history=[],
+            error="That player could not be found in the live FPL data.",
+        ), 404
+    except FPLDataError as error:
+        return render_template(
+            "player_detail.html",
+            player=None,
+            history=[],
             error=str(error),
         ), 502
 
