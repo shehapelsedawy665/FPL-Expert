@@ -1,0 +1,504 @@
+Continue building the existing FPL Expert application.
+
+IMPORTANT:
+- Do not rebuild or redesign the existing Players page.
+- Do not change the current Expert Score formula.
+- Do not remove Data Confidence.
+- Preserve all existing working functionality.
+- Use the existing FPL data/API integration and existing player scoring functions wherever possible.
+- Implement this feature incrementally and cleanly.
+- After completing this task, STOP and wait for my next prompt.
+
+==================================================
+FEATURE: MY TEAM / TEAM ANALYZER
+==================================================
+
+We now need a new page called:
+
+My Team
+
+The purpose of this page is to allow a Fantasy Premier League manager to enter their FPL Team ID and receive an intelligent analysis of their current squad.
+
+Do NOT implement automatic transfers yet.
+Do NOT implement authentication yet.
+Do NOT implement historical backtesting yet.
+
+This task is specifically for importing and analyzing the user's current FPL squad.
+
+==================================================
+1. NAVIGATION
+==================================================
+
+Add a navigation item:
+
+My Team
+
+Keep the existing visual style of FPL Expert.
+
+The page must be responsive and work properly on mobile.
+
+==================================================
+2. TEAM ID INPUT
+==================================================
+
+At the top of the My Team page, show:
+
+"Analyze your FPL team"
+
+Description:
+
+"Enter your FPL Team ID to import your current squad and get recommendations."
+
+Input:
+
+FPL Team ID
+
+Button:
+
+Analyze Team
+
+Also add a small help text explaining:
+
+"Your Team ID is the number in the URL when viewing your FPL team/history."
+
+Validate the input.
+
+Only accept positive numeric IDs.
+
+Show a useful error message for:
+- invalid ID
+- team not found
+- FPL API unavailable
+- squad unavailable
+
+Do not crash the page if the API request fails.
+
+==================================================
+3. FETCH THE REAL FPL TEAM
+==================================================
+
+Use the appropriate Fantasy Premier League endpoints to retrieve the manager/team information and current squad.
+
+Do not use mock players.
+
+Do not fabricate a squad.
+
+Determine the current relevant Gameweek dynamically.
+
+Do not hard-code a Gameweek number.
+
+Map the FPL player IDs from the imported squad to the existing player data already used by the Players page.
+
+This is important because we want to reuse:
+
+- Expert Score
+- Data Confidence
+- Current Form Score
+- Future FPL Score
+- Value Score
+- price
+- position
+- team
+- availability/status
+- fixture information
+
+Do not duplicate the scoring engine.
+
+There must be one source of truth for player scoring.
+
+==================================================
+4. TEAM SUMMARY
+==================================================
+
+After successfully importing the team, display a summary card.
+
+Show available real information such as:
+
+Manager name
+Team name
+Overall rank
+Total points
+Current Gameweek
+Bank
+Squad value
+
+If a field cannot reliably be obtained from the available FPL data, do not invent it.
+
+==================================================
+5. DISPLAY ALL 15 PLAYERS
+==================================================
+
+Display the user's complete squad.
+
+Group players by:
+
+Goalkeepers
+Defenders
+Midfielders
+Forwards
+
+Each player card should show:
+
+Player name
+Team
+Position
+Price
+
+Expert Score
+Data Confidence
+
+Current Form Score
+Future FPL Score
+Value Score
+
+Current FPL points
+Form
+Ownership
+
+Next fixture
+Next 3 fixture average
+Next 5 fixture average
+
+Keep the UI readable.
+
+Do not make the cards unnecessarily huge.
+
+The mobile experience is especially important.
+
+==================================================
+6. SQUAD ANALYSIS
+==================================================
+
+Create a deterministic analysis engine for the imported squad.
+
+Do NOT use random recommendations.
+
+Analyze each player's:
+
+Expert Score
+Data Confidence
+Current Form Score
+Future FPL Score
+minutes
+availability
+chance of playing if available
+upcoming fixtures
+position
+
+The analysis should identify:
+
+Strong players
+Average players
+Weak players
+Rotation/injury risks
+
+However:
+
+Data Confidence must NOT be treated as player quality.
+
+It represents how confident we are in the player's score.
+
+For example:
+
+A player with Expert Score 75 and Low confidence should still have a quality score of 75.
+
+The UI should communicate that the recommendation is less certain.
+
+==================================================
+7. BEST STARTING XI
+==================================================
+
+Generate a recommended Starting XI from the user's existing 15 players.
+
+The XI must respect valid FPL formations.
+
+Exactly:
+
+1 goalkeeper
+
+At least:
+3 defenders
+2 midfielders
+1 forward
+
+Exactly:
+10 outfield players
+
+Do not recommend an invalid formation.
+
+Examples of valid formations include:
+
+3-4-3
+3-5-2
+4-4-2
+4-3-3
+4-5-1
+5-3-2
+5-4-1
+5-2-3
+
+Choose the strongest legal XI using the existing scoring information.
+
+Display:
+
+Recommended Starting XI
+
+Also display the selected formation.
+
+Example:
+
+Recommended Formation
+3-5-2
+
+==================================================
+8. BENCH ORDER
+==================================================
+
+Recommend the bench order.
+
+Display:
+
+Bench GK
+
+and
+
+1st Substitute
+2nd Substitute
+3rd Substitute
+
+The substitute order should consider player quality and likelihood of playing.
+
+Do not simply use price.
+
+==================================================
+9. CAPTAIN AND VICE CAPTAIN
+==================================================
+
+Recommend:
+
+Captain
+Vice Captain
+
+Captaincy should NOT simply use the highest season total points.
+
+Use primarily short-term expected FPL potential.
+
+Consider:
+
+Current Form Score
+Future FPL Score
+upcoming fixture difficulty
+expected minutes / availability
+attacking potential where relevant
+Expert Score
+
+Data Confidence may affect how strongly the recommendation is presented, but it must not directly redefine player quality.
+
+Display a short reason.
+
+Example:
+
+Captain
+Mohamed Salah
+
+"Excellent current form, strong attacking output and favorable upcoming fixture."
+
+Vice Captain
+...
+
+Keep the reason concise and based on actual available data.
+
+==================================================
+10. TEAM HEALTH SUMMARY
+==================================================
+
+Create a section:
+
+Team Health
+
+Show useful counts such as:
+
+Strong Picks
+Weak Picks
+Injury/Availability Risks
+Low Confidence Evaluations
+
+Also calculate:
+
+Average Squad Expert Score
+
+and
+
+Average Starting XI Expert Score
+
+Do NOT invent a fake overall score unless it is mathematically derived from existing metrics.
+
+==================================================
+11. ATTENTION REQUIRED
+==================================================
+
+Create a section:
+
+Attention Required
+
+Only show players where there is a meaningful reason for concern.
+
+Examples:
+
+injured
+doubtful
+suspended
+low chance of playing
+very poor current form
+poor future fixtures
+very low Expert Score relative to the squad
+
+For each player, explain the actual reason.
+
+Example:
+
+Player Name
+
+"Low expected minutes and difficult upcoming fixtures."
+
+Do not create generic warnings for every player.
+
+==================================================
+12. ARCHITECTURE
+==================================================
+
+Keep analysis logic separate from UI components.
+
+Prefer reusable functions such as:
+
+getRecommendedXI()
+getBenchOrder()
+getCaptainCandidates()
+analyzeSquadHealth()
+
+Names can differ if the existing architecture has better conventions.
+
+Do not create multiple conflicting implementations of Expert Score.
+
+Use existing TypeScript types where possible.
+
+Add types/interfaces where needed.
+
+==================================================
+13. IMPORTANT EDGE CASES
+==================================================
+
+Handle:
+
+invalid Team ID
+private/unavailable data if applicable
+new manager
+missing player data
+missing fixture data
+injured players
+players transferred between clubs
+players with very few minutes
+FPL API temporarily failing
+
+The page must fail gracefully.
+
+==================================================
+14. UI
+==================================================
+
+Match the existing FPL Expert design.
+
+Use the existing:
+
+dark navy theme
+green accents
+cards
+typography
+spacing
+badges
+
+Data Confidence should retain its current visual distinction:
+
+High
+Medium
+Low
+
+Make the analysis easy to scan.
+
+Do not display 15 enormous cards followed by another 15 enormous recommendation cards.
+
+Use compact cards/rows for squad overview and more detail only where useful.
+
+==================================================
+15. DO NOT BUILD YET
+==================================================
+
+Do NOT implement:
+
+transfer recommendations
+transfer hit calculations
+wildcard recommendations
+free hit
+bench boost
+triple captain
+chip strategy
+AI chat
+authentication
+saved teams
+backtesting
+
+Those will be separate tasks.
+
+==================================================
+16. TESTING
+==================================================
+
+Test the feature with valid and invalid Team IDs.
+
+Verify:
+
+15 players are imported when valid data is available.
+
+Player IDs map correctly to the existing player database.
+
+Expert Scores shown in My Team match the Players page.
+
+The Starting XI always contains exactly 11 players.
+
+The formation is legal.
+
+Bench contains exactly 4 players.
+
+There is exactly one bench goalkeeper.
+
+Captain is in the Starting XI.
+
+Vice Captain is in the Starting XI.
+
+Captain and Vice Captain are different players.
+
+Unavailable players are handled sensibly.
+
+No fake data is shown.
+
+No existing Players page functionality is broken.
+
+==================================================
+FINAL INSTRUCTION
+==================================================
+
+Implement this My Team feature now.
+
+Inspect the existing codebase first and integrate with its current architecture instead of unnecessarily rewriting working code.
+
+When finished:
+
+1. Briefly summarize what you implemented.
+2. Tell me which files were created or modified.
+3. Tell me how to test the feature manually.
+4. Mention any limitation caused by the official FPL API.
+5. STOP.
+
+Do not start implementing transfer recommendations.
+
+Wait for my next prompt.

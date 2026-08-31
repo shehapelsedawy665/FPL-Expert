@@ -14,7 +14,10 @@
     <main class="players-page detail-page">
       <header class="detail-header">
         <a class="brand-link" href="{{ url_for('home') }}">FPL Expert</a>
-        <a class="back-link" href="{{ url_for('players') }}">← All players</a>
+        <div class="header-actions">
+          <a class="back-link" href="{{ url_for('my_team') }}">My Team</a>
+          <a class="back-link" href="{{ url_for('players') }}">← All players</a>
+        </div>
       </header>
 
       {% if error %}

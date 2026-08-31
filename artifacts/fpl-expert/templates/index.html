@@ -15,7 +15,10 @@
       <div class="badge" aria-hidden="true">FANTASY PREMIER LEAGUE</div>
       <h1>FPL Expert</h1>
       <p>Your home for Fantasy Premier League analysis.</p>
-      <a class="players-link" href="{{ url_for('players') }}">View players</a>
+      <div class="home-actions">
+        <a class="players-link" href="{{ url_for('players') }}">View players</a>
+        <a class="secondary-link" href="{{ url_for('my_team') }}">My Team</a>
+      </div>
     </main>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
   </body>

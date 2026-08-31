@@ -13,6 +13,10 @@ FPL_FIXTURES_URL = "https://fantasy.premierleague.com/api/fixtures/"
 FPL_ELEMENT_SUMMARY_URL = (
     "https://fantasy.premierleague.com/api/element-summary/{player_id}/"
 )
+FPL_ENTRY_URL = "https://fantasy.premierleague.com/api/entry/{team_id}/"
+FPL_ENTRY_PICKS_URL = (
+    "https://fantasy.premierleague.com/api/entry/{team_id}/event/{gameweek}/picks/"
+)
 FPL_CACHE_TTL_SECONDS = 300
 PLAYER_STATUS_LABELS = {
     "a": "Available",
@@ -26,6 +30,14 @@ PLAYER_STATUS_LABELS = {
 
 class FPLDataError(Exception):
     """Raised when the live FPL data cannot be fetched or understood."""
+
+
+class FPLTeamError(FPLDataError):
+    """Raised when a public FPL manager entry or squad cannot be imported."""
+
+    def __init__(self, message: str, category: str) -> None:
+        super().__init__(message)
+        self.category = category
 
 
 class TTLCache:
@@ -211,6 +223,104 @@ def fetch_player_summary(player_id: int) -> dict[str, Any]:
 
     _response_cache.set(cache_key, payload)
     return payload
+
+
+def fetch_team_entry(team_id: int) -> dict[str, Any]:
+    if team_id <= 0:
+        raise FPLTeamError(
+            "Enter a positive numeric FPL Team ID.",
+            "invalid",
+        )
+
+    cache_key = f"team-entry:{team_id}"
+    cached = _response_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        payload = _fetch_json(
+            FPL_ENTRY_URL.format(team_id=team_id),
+            "the FPL team service",
+        )
+    except FPLDataError as error:
+        if "HTTP 404" in str(error):
+            raise FPLTeamError(
+                "That FPL Team ID could not be found.",
+                "not_found",
+            ) from error
+        raise FPLTeamError(
+            "The FPL team service is unavailable right now.",
+            "unavailable",
+        ) from error
+    if not isinstance(payload, dict) or not payload.get("id"):
+        raise FPLTeamError(
+            "That FPL Team ID could not be found.",
+            "not_found",
+        )
+
+    _response_cache.set(cache_key, payload)
+    return payload
+
+
+def fetch_team_picks(team_id: int, gameweek: int) -> dict[str, Any]:
+    if team_id <= 0:
+        raise FPLTeamError(
+            "Enter a positive numeric FPL Team ID.",
+            "invalid",
+        )
+    if gameweek <= 0:
+        raise FPLTeamError(
+            "The current FPL Gameweek is not available.",
+            "unavailable",
+        )
+
+    cache_key = f"team-picks:{team_id}:{gameweek}"
+    cached = _response_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    try:
+        payload = _fetch_json(
+            FPL_ENTRY_PICKS_URL.format(team_id=team_id, gameweek=gameweek),
+            "the FPL squad service",
+        )
+    except FPLDataError as error:
+        if "HTTP 404" in str(error):
+            raise FPLTeamError(
+                "The current squad is not available for this FPL Team ID.",
+                "squad_unavailable",
+            ) from error
+        raise FPLTeamError(
+            "The FPL squad service is unavailable right now.",
+            "unavailable",
+        ) from error
+    if not isinstance(payload, dict) or not isinstance(payload.get("picks"), list):
+        raise FPLTeamError(
+            "The current squad is not available for this FPL Team ID.",
+            "squad_unavailable",
+        )
+
+    _response_cache.set(cache_key, payload)
+    return payload
+
+
+def fetch_team_data(team_id: int, reference_gameweek: int) -> dict[str, Any]:
+    entry = fetch_team_entry(team_id)
+    picks_payload = fetch_team_picks(team_id, reference_gameweek)
+    picks = [
+        pick for pick in picks_payload.get("picks", []) if isinstance(pick, dict)
+    ]
+    if not picks:
+        raise FPLTeamError(
+            "The current squad is not available for this FPL Team ID.",
+            "squad_unavailable",
+        )
+    return {
+        "entry": entry,
+        "picks": picks,
+        "gameweek": reference_gameweek,
+        "entry_history": picks_payload.get("entry_history", {}),
+    }
 
 
 def number_value(value: Any) -> float:

@@ -5,14 +5,17 @@ from werkzeug.exceptions import NotFound
 
 from services.fpl_service import (
     FPLDataError,
+    FPLTeamError,
     add_fixture_data,
     add_history_team_names,
     filter_and_sort_players,
     fetch_bootstrap_data,
     fetch_fixtures,
     fetch_player_summary,
+    fetch_team_data,
 )
 from services.rating_engine import add_ratings
+from services.team_analyzer import analyze_squad, import_squad
 
 app = Flask(__name__)
 
@@ -52,6 +55,25 @@ def percent(value):
 @app.get("/")
 def home():
     return render_template("index.html")
+
+
+def team_summary(entry: dict, gameweek: int) -> dict:
+    return {
+        "manager_name": " ".join(
+            part
+            for part in (
+                entry.get("player_first_name"),
+                entry.get("player_last_name"),
+            )
+            if part
+        ),
+        "team_name": entry.get("name"),
+        "overall_rank": entry.get("summary_overall_rank"),
+        "total_points": entry.get("summary_overall_points"),
+        "gameweek": gameweek,
+        "bank": entry.get("last_deadline_bank"),
+        "squad_value": entry.get("last_deadline_value"),
+    }
 
 
 def live_rated_players(recent_history_by_player=None):
@@ -118,6 +140,60 @@ def players():
             },
             error=str(error),
         ), 502
+
+
+@app.get("/my-team")
+def my_team():
+    team_id_input = request.args.get("team_id", "").strip()
+    page_data = {
+        "team_id": team_id_input,
+        "error": None,
+        "error_category": None,
+        "summary": None,
+        "groups": [],
+        "analysis": None,
+        "squad_count": 0,
+    }
+
+    if team_id_input:
+        if not team_id_input.isdigit() or int(team_id_input) <= 0:
+            page_data.update(
+                error="Enter a positive numeric FPL Team ID.",
+                error_category="invalid",
+            )
+        else:
+            try:
+                bootstrap, rated_players = live_rated_players()
+                team_data = fetch_team_data(
+                    int(team_id_input), bootstrap.reference_gameweek
+                )
+                squad = import_squad(team_data, rated_players)
+                if not squad:
+                    raise FPLTeamError(
+                        "The current squad is not available for this FPL Team ID.",
+                        "squad_unavailable",
+                    )
+                analysis = analyze_squad(squad)
+                page_data.update(
+                    summary=team_summary(
+                        team_data["entry"], team_data["gameweek"]
+                    ),
+                    groups=analysis["groups"],
+                    analysis=analysis,
+                    squad_count=len(squad),
+                )
+            except FPLTeamError as error:
+                page_data.update(
+                    error=str(error),
+                    error_category=error.category,
+                )
+            except FPLDataError as error:
+                page_data.update(
+                    error=str(error),
+                    error_category="unavailable",
+                )
+
+    return render_template("my_team.html", **page_data)
 
 
 @app.get("/player/<int:player_id>")
