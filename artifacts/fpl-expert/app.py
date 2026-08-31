@@ -12,6 +12,7 @@ from services.fpl_service import (
     fetch_fixtures,
     fetch_player_summary,
 )
+from services.rating_engine import add_ratings
 
 app = Flask(__name__)
 
@@ -53,6 +54,22 @@ def home():
     return render_template("index.html")
 
 
+def live_rated_players():
+    bootstrap = fetch_bootstrap_data()
+    fixtures = fetch_fixtures()
+    enriched_players = add_fixture_data(
+        bootstrap.players,
+        fixtures,
+        bootstrap.teams,
+        bootstrap.reference_gameweek,
+    )
+    rated_players = add_ratings(
+        enriched_players,
+        reference_gameweek=bootstrap.reference_gameweek,
+    )
+    return bootstrap, rated_players
+
+
 @app.get("/players")
 def players():
     name = request.args.get("name", "")
@@ -62,14 +79,7 @@ def players():
     order = request.args.get("order", "desc")
 
     try:
-        bootstrap = fetch_bootstrap_data()
-        fixtures = fetch_fixtures()
-        enriched_players = add_fixture_data(
-            bootstrap.players,
-            fixtures,
-            bootstrap.teams,
-            bootstrap.reference_gameweek,
-        )
+        bootstrap, enriched_players = live_rated_players()
         filtered_players = filter_and_sort_players(
             enriched_players,
             name=name,
@@ -112,21 +122,14 @@ def players():
 @app.get("/player/<int:player_id>")
 def player_detail(player_id: int):
     try:
-        bootstrap = fetch_bootstrap_data()
+        bootstrap, rated_players = live_rated_players()
         player = next(
-            (player for player in bootstrap.players if player.get("id") == player_id),
+            (player for player in rated_players if player.get("id") == player_id),
             None,
         )
         if player is None:
             raise NotFound
 
-        fixtures = fetch_fixtures()
-        player_with_fixtures = add_fixture_data(
-            [player],
-            fixtures,
-            bootstrap.teams,
-            bootstrap.reference_gameweek,
-        )[0]
         summary = fetch_player_summary(player_id)
         history = [
             item for item in summary.get("history", []) if isinstance(item, dict)
@@ -135,7 +138,7 @@ def player_detail(player_id: int):
         history.sort(key=lambda item: item.get("round") or 0, reverse=True)
         return render_template(
             "player_detail.html",
-            player=player_with_fixtures,
+            player=player,
             history=history,
             error=None,
         )

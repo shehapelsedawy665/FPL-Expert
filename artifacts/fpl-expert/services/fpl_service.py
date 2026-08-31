@@ -326,6 +326,26 @@ def fixture_data_for_team(
         "next_5_fixtures": upcoming[:5],
         "next_3_avg_difficulty": _average(next_3_difficulties),
         "next_5_avg_difficulty": _average(next_5_difficulties),
+        "team_attack_strength": (
+            _average(
+                [
+                    number_value(team_lookup[team_id].get("strength_attack_home")),
+                    number_value(team_lookup[team_id].get("strength_attack_away")),
+                ]
+            )
+            if team_id in team_lookup
+            else None
+        ),
+        "team_defence_strength": (
+            _average(
+                [
+                    number_value(team_lookup[team_id].get("strength_defence_home")),
+                    number_value(team_lookup[team_id].get("strength_defence_away")),
+                ]
+            )
+            if team_id in team_lookup
+            else None
+        ),
     }
 
 
@@ -392,6 +412,10 @@ def filter_and_sort_players(
         "ict_index",
         "points_per_game",
         "transfers_in_gameweek",
+        "expert_score",
+        "current_form_score",
+        "future_fpl_score",
+        "value_score",
     }
     if sort_by not in allowed_sort_fields:
         sort_by = "total_points"

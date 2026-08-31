@@ -109,6 +109,11 @@
                   <th scope="col">Player</th>
                   <th scope="col">Team</th>
                   <th scope="col">Position</th>
+                  <th scope="col">Expert</th>
+                  <th scope="col">Form score</th>
+                  <th scope="col">Future score</th>
+                  <th scope="col">Value score</th>
+                  <th scope="col">Rating</th>
                   <th scope="col">Status</th>
                   <th scope="col">Chance</th>
                   <th scope="col">Price</th>
@@ -151,6 +156,11 @@
                       <span class="team-full">{{ player.team_name|display }}</span>
                     </td>
                     <td data-label="Position">{{ player.position_short_name or player.position_name|display }}</td>
+                    <td data-label="Expert" class="rating-number">{{ player.expert_score|decimal(1) }}</td>
+                    <td data-label="Form score">{{ player.current_form_score|decimal(1) }}</td>
+                    <td data-label="Future score">{{ player.future_fpl_score|decimal(1) }}</td>
+                    <td data-label="Value score">{{ player.value_score|decimal(1) }}</td>
+                    <td data-label="Rating"><span class="rating-label">{{ player.rating_label|display }}</span></td>
                     <td data-label="Status">{{ player.status_label|display }}</td>
                     <td data-label="Chance">{{ player.chance_of_playing_next_round|percent }}</td>
                     <td data-label="Price">{{ player.now_cost|price }}</td>

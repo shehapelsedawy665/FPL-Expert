@@ -235,7 +235,7 @@ p {
 
 .players-table {
   width: 100%;
-  min-width: 2350px;
+  min-width: 2750px;
   border-collapse: collapse;
   color: #dce8f5;
   font-size: 0.83rem;
@@ -314,6 +314,23 @@ p {
 
 .stat-emphasis {
   color: #86efac;
+  font-weight: 800;
+}
+
+.rating-number {
+  color: #86efac;
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.rating-label {
+  display: inline-block;
+  border: 1px solid rgba(74, 222, 128, 0.32);
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
+  color: #d7ffe3;
+  background: rgba(74, 222, 128, 0.08);
+  font-size: 0.68rem;
   font-weight: 800;
 }
 
@@ -431,6 +448,77 @@ p {
   font-size: 0.8rem;
   font-weight: 500;
   line-height: 1.45;
+}
+
+.rating-section {
+  border-color: rgba(74, 222, 128, 0.28);
+}
+
+.rating-hero-score {
+  display: grid;
+  justify-items: end;
+  gap: 0.25rem;
+}
+
+.rating-hero-score strong {
+  color: #86efac;
+  font-size: 2rem;
+  line-height: 1;
+}
+
+.rating-hero-score span {
+  color: #d7ffe3;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.rating-explanation {
+  margin: 0 0 1rem;
+  color: #dce8f5;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.rating-score-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.65rem;
+  margin-bottom: 0.8rem;
+}
+
+.rating-score-row div,
+.breakdown-grid div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.7rem;
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 0.55rem;
+  padding: 0.7rem;
+  background: rgba(16, 42, 75, 0.5);
+}
+
+.rating-score-row span,
+.breakdown-grid span {
+  color: #91a6c0;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.rating-score-row strong,
+.breakdown-grid strong {
+  color: #ffffff;
+  font-size: 0.9rem;
+}
+
+.breakdown-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.55rem;
+}
+
+.penalty-value {
+  color: #fdba74 !important;
 }
 
 .status-dot {
@@ -818,6 +906,14 @@ p {
   .metric-grid,
   .metrics-wide {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .rating-score-row {
+    grid-template-columns: 1fr;
+  }
+
+  .breakdown-grid {
+    grid-template-columns: 1fr;
   }
 
   .stat-list {

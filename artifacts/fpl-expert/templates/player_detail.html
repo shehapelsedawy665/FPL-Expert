@@ -42,6 +42,35 @@
           </div>
         </section>
 
+        <section class="detail-section rating-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">CUSTOM RATING ENGINE</div>
+              <h2>Why this rating?</h2>
+            </div>
+            <div class="rating-hero-score">
+              <strong>{{ player.expert_score|decimal(1) }}</strong>
+              <span>{{ player.rating_label|display }}</span>
+            </div>
+          </div>
+          <p class="rating-explanation">{{ player.rating_explanation|display }}</p>
+          <div class="rating-score-row">
+            <div><span>Current form</span><strong>{{ player.current_form_score|decimal(1) }}</strong></div>
+            <div><span>Future FPL</span><strong>{{ player.future_fpl_score|decimal(1) }}</strong></div>
+            <div><span>Value</span><strong>{{ player.value_score|decimal(1) }}</strong></div>
+          </div>
+          <div class="breakdown-grid">
+            <div><span>Form contribution</span><strong>{{ player.rating_breakdown.form_contribution|decimal(1) }}</strong></div>
+            <div><span>Fixture contribution</span><strong>{{ player.rating_breakdown.fixture_contribution|decimal(1) }}</strong></div>
+            <div><span>Attacking contribution</span><strong>{{ player.rating_breakdown.attacking_contribution|decimal(1) }}</strong></div>
+            <div><span>Minutes/security contribution</span><strong>{{ player.rating_breakdown.minutes_security_contribution|decimal(1) }}</strong></div>
+            <div><span>Value contribution</span><strong>{{ player.rating_breakdown.value_contribution|decimal(1) }}</strong></div>
+            <div><span>Availability penalty</span><strong class="penalty-value">−{{ player.rating_breakdown.availability_penalty|decimal(1) }}</strong></div>
+            <div><span>Minutes penalty</span><strong class="penalty-value">−{{ player.rating_breakdown.minutes_penalty|decimal(1) }}</strong></div>
+            <div><span>Team/ownership context</span><strong>{{ player.rating_breakdown.context_contribution|decimal(1) }}</strong></div>
+          </div>
+        </section>
+
         <section class="detail-section">
           <div class="section-heading">
             <div>

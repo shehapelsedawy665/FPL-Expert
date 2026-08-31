@@ -1,0 +1,132 @@
+Add a real custom FPL rating engine to the existing FPL Expert app.
+IMPORTANT: Do not use AI-generated subjective scores. The scores must be deterministic and calculated from real FPL data.
+Create three scores for every player:
+Current Form Score /100
+Future FPL Score /100
+Expert Score /100
+GENERAL RULES:
+Normalize all metrics by position where appropriate.
+Do not compare goalkeepers directly with midfielders.
+Use percentile-based normalization within each position.
+Clamp all scores between 0 and 100.
+Handle missing data safely.
+Do not reward players with extremely low minutes just because of high per-90 stats.
+CURRENT FORM SCORE: Build this from:
+recent FPL points
+form
+points per game
+minutes played
+goals
+assists
+clean sheets where position-relevant
+bonus
+expected goals
+expected assists
+expected goal involvements
+ICT index
+influence
+creativity
+threat
+Give more weight to recent performance than season totals.
+FUTURE FPL SCORE: Build this from:
+next 3 fixture difficulty
+next 5 fixture difficulty
+home/away fixtures
+chance of playing
+status
+recent minutes / expected minutes proxy
+current form
+xG
+xA
+xGI
+team attacking/defensive context when available
+ownership
+gameweek transfers in/out
+price/value
+POSITION-SPECIFIC LOGIC:
+Goalkeepers: prioritize:
+clean-sheet potential
+fixture quality
+saves if available
+bonus potential
+minutes security
+value
+Defenders: prioritize:
+clean-sheet potential
+fixtures
+attacking threat
+xG
+xA
+xGI
+bonus potential
+minutes security
+Midfielders: prioritize:
+xGI
+xG
+xA
+creativity
+threat
+recent returns
+fixtures
+minutes security
+bonus
+Forwards: prioritize:
+xG
+xGI
+threat
+recent goals
+fixtures
+minutes security
+bonus
+MINUTES SECURITY: Add a minutes security component. Penalize players who:
+have very low recent minutes
+are flagged
+have reduced chance of playing
+are unavailable
+VALUE SCORE: Create a separate Value Score /100 using expected/future FPL value relative to player price.
+EXPERT SCORE: Calculate Expert Score as:
+35% Current Form Score
+50% Future FPL Score
+15% Value Score
+Then apply availability/minutes penalties after the weighted score.
+Add labels:
+90–100 = Elite
+80–89 = Excellent
+70–79 = Strong
+60–69 = Decent
+50–59 = Average
+below 50 = Weak
+UI CHANGES: On /players, show:
+Expert Score
+Current Form Score
+Future FPL Score
+Value Score
+rating label
+Add sorting by:
+Expert Score
+Future FPL Score
+Current Form Score
+Value Score
+On /player/<id>, add a "Why this rating?" section.
+This section must show a transparent breakdown of:
+form contribution
+fixture contribution
+attacking contribution
+minutes/security contribution
+value contribution
+availability penalty
+Do not just show a final number.
+Add a short explanation such as: "Strong upcoming fixtures, high xGI and secure minutes are driving this score."
+Use rule-based explanations only.
+IMPORTANT QUALITY CHECK: After implementing the rating engine, test it against at least:
+5 goalkeepers
+10 defenders
+10 midfielders
+10 forwards
+Verify that:
+injured/unavailable players are penalized
+low-minute players are not incorrectly ranked at the top
+high-performing players with good fixtures generally rank strongly
+the same normalization is not incorrectly used across all positions
+Do NOT add buy/sell recommendations yet. Do NOT add captain recommendations yet. Do NOT add AI chat yet.
+Finish this rating engine, test it, and stop for my next instruction.
