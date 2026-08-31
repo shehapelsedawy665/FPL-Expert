@@ -1118,6 +1118,60 @@ p {
   font-size: 0.85rem;
 }
 
+.bench-priority-row {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.bench-priority-main {
+  flex: 1;
+  min-width: 6rem;
+}
+
+.bench-player-name {
+  display: block;
+  font-size: 0.85rem;
+}
+
+.bench-priority-main small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #9fb5ca;
+  font-size: 0.7rem;
+}
+
+.bench-priority-score {
+  display: grid;
+  justify-items: end;
+  gap: 0.15rem;
+}
+
+.bench-priority-score span,
+.bench-priority-meta,
+.bench-priority-reason {
+  color: #9fb5ca;
+  font-size: 0.7rem;
+}
+
+.bench-priority-score strong {
+  color: #86efac;
+}
+
+.bench-priority-meta {
+  display: flex;
+  flex-basis: 100%;
+  flex-wrap: wrap;
+  gap: 0.45rem 0.8rem;
+  padding-left: 3.75rem;
+}
+
+.bench-priority-reason {
+  flex-basis: 100%;
+  margin: 0;
+  padding-left: 3.75rem;
+  line-height: 1.45;
+}
+
 .split-analysis {
   display: grid;
   grid-template-columns: 1fr 1fr;

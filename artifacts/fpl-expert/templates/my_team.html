@@ -193,7 +193,23 @@
             <div class="recommendation-list">
               <div class="recommendation-row"><span class="recommendation-position">GK</span><span>Bench GK</span><strong>{{ analysis.bench.goalkeeper.web_name|display if analysis.bench.goalkeeper else "—" }}</strong></div>
               {% for player in analysis.bench.substitutes %}
-                <div class="recommendation-row"><span class="recommendation-position">{{ loop.index }}SUB</span><span>{{ player.web_name|display }}</span><strong>{{ player.expert_score|decimal(1) }}</strong></div>
+                <div class="recommendation-row bench-priority-row">
+                  <span class="recommendation-position">{{ loop.index }}SUB</span>
+                  <div class="bench-priority-main">
+                    <strong class="bench-player-name">{{ player.web_name|display }}</strong>
+                    <small>{{ player.position_short_name|display }}</small>
+                  </div>
+                  <div class="bench-priority-score">
+                    <span>Priority</span>
+                    <strong>{{ player.bench_priority_score|decimal(1) }}</strong>
+                  </div>
+                  <div class="bench-priority-meta">
+                    <span>Expert {{ player.expert_score|decimal(1) }}</span>
+                    <span>Minutes {{ player.bench_priority_inputs.minutes_security|decimal(1) }}</span>
+                    <span>Next GW {{ player.bench_priority_inputs.next_gameweek_performance_signal|decimal(1) }}</span>
+                  </div>
+                  <p class="bench-priority-reason">{{ player.bench_priority_reason }}</p>
+                </div>
               {% endfor %}
             </div>
           </div>

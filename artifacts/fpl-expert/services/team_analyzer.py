@@ -23,6 +23,15 @@ POSITION_NAMES = {
     4: "Forwards",
 }
 
+# Bench V1 follows the requested priority hierarchy. Future FPL Score already
+# contains the project's fixture, attacking, minutes, and availability inputs,
+# so no raw sub-metrics are added again here.
+BENCH_PRIORITY_WEIGHTS = {
+    "availability_minutes": 0.55,
+    "next_gameweek_performance": 0.35,
+    "expert_score_support": 0.10,
+}
+
 
 def number_value(value: Any) -> float:
     try:
@@ -73,6 +82,98 @@ def _playing_security_key(
         number_value(player.get("future_fpl_score")),
         number_value(player.get("expert_score")),
     )
+
+
+def _bench_priority_inputs(player: dict[str, Any]) -> dict[str, Any]:
+    availability_eligible = not _has_clear_availability_problem(player)
+    raw_minutes_security = number_value(player.get("minutes_security"))
+    availability_minutes_signal = (
+        raw_minutes_security if availability_eligible else 0.0
+    )
+    next_gameweek_performance = number_value(player.get("future_fpl_score"))
+    expert_score = number_value(player.get("expert_score"))
+    priority_score = (
+        availability_minutes_signal
+        * BENCH_PRIORITY_WEIGHTS["availability_minutes"]
+        + next_gameweek_performance
+        * BENCH_PRIORITY_WEIGHTS["next_gameweek_performance"]
+        + expert_score * BENCH_PRIORITY_WEIGHTS["expert_score_support"]
+    )
+    return {
+        "availability_eligible": availability_eligible,
+        "availability_minutes_signal": round(availability_minutes_signal, 1),
+        "minutes_security": round(raw_minutes_security, 1),
+        "expected_minutes_proxy": round(
+            number_value(player.get("expected_minutes_proxy")), 1
+        ),
+        "official_availability_score": round(
+            number_value(player.get("availability_score")), 1
+        ),
+        "status": player.get("status"),
+        "chance_of_playing_next_round": player.get(
+            "chance_of_playing_next_round"
+        ),
+        "next_gameweek_performance_signal": round(
+            next_gameweek_performance, 1
+        ),
+        "expert_score": round(expert_score, 1),
+        "bench_priority_score": round(priority_score, 1),
+    }
+
+
+def _bench_priority_key(player: dict[str, Any]) -> tuple[float, ...]:
+    inputs = _bench_priority_inputs(player)
+    return (
+        1.0 if inputs["availability_eligible"] else 0.0,
+        inputs["bench_priority_score"],
+        inputs["availability_minutes_signal"],
+        inputs["next_gameweek_performance_signal"],
+        inputs["expert_score"],
+        -number_value(player.get("id")),
+    )
+
+
+def _bench_priority_reason(
+    player: dict[str, Any],
+    inputs: dict[str, Any],
+) -> str:
+    if not inputs["availability_eligible"]:
+        reasons = _availability_reasons(player)
+        detail = ", ".join(reasons) if reasons else "clear availability risk"
+        return (
+            f"Placed after available options because of {detail}; "
+            "not a reliable automatic replacement."
+        )
+
+    minutes = inputs["availability_minutes_signal"]
+    if minutes >= 70:
+        minutes_reason = "secure expected minutes"
+    elif minutes <= 35:
+        minutes_reason = "limited expected minutes"
+    else:
+        minutes_reason = "moderate expected minutes"
+    return (
+        f"{minutes_reason}; next-GW projection "
+        f"{inputs['next_gameweek_performance_signal']:.1f}; "
+        f"Expert Score {inputs['expert_score']:.1f} supports the ranking."
+    )
+
+
+def _annotate_bench_player(
+    player: dict[str, Any],
+    rank: int,
+) -> dict[str, Any]:
+    annotated = dict(player)
+    inputs = _bench_priority_inputs(player)
+    annotated.update(
+        {
+            "bench_priority_rank": rank,
+            "bench_priority_score": inputs["bench_priority_score"],
+            "bench_priority_reason": _bench_priority_reason(player, inputs),
+            "bench_priority_inputs": inputs,
+        }
+    )
+    return annotated
 
 
 def _fixture_reason(player: dict[str, Any]) -> str:
@@ -191,19 +292,30 @@ def _is_legal_xi(
     players: list[dict[str, Any]],
     formation: tuple[int, int, int],
 ) -> bool:
-    if len(players) != 11:
-        return False
-    counts = {
+    counts = _position_counts(players)
+    return (
+        _is_legal_fpl_xi(players)
+        and counts[2] == formation[0]
+        and counts[3] == formation[1]
+        and counts[4] == formation[2]
+    )
+
+
+def _position_counts(players: list[dict[str, Any]]) -> dict[int, int]:
+    return {
         position_id: sum(
             player.get("element_type") == position_id for player in players
         )
         for position_id in (1, 2, 3, 4)
     }
+
+
+def _is_legal_fpl_xi(players: list[dict[str, Any]]) -> bool:
+    if len(players) != 11:
+        return False
+    counts = _position_counts(players)
     return (
         counts[1] == 1
-        and counts[2] == formation[0]
-        and counts[3] == formation[1]
-        and counts[4] == formation[2]
         and 3 <= counts[2] <= 5
         and 2 <= counts[3] <= 5
         and 1 <= counts[4] <= 3
@@ -336,16 +448,110 @@ def get_bench_order(
     )
     bench_outfield = sorted(
         [player for player in bench if player.get("element_type") != 1],
-        key=_playing_security_key,
+        key=_bench_priority_key,
         reverse=True,
     )
+    ordered_substitutes = [
+        _annotate_bench_player(player, rank)
+        for rank, player in enumerate(bench_outfield[:3], 1)
+    ]
     return {
         "goalkeeper": bench_goalkeepers[0] if bench_goalkeepers else None,
-        "substitutes": bench_outfield[:3],
+        "substitutes": ordered_substitutes,
         "players": (
             ([bench_goalkeepers[0]] if bench_goalkeepers else [])
-            + bench_outfield[:3]
+            + ordered_substitutes
         ),
+    }
+
+
+def _formation_label_for_xi(players: list[dict[str, Any]]) -> str:
+    counts = _position_counts(players)
+    return f"{counts[2]}-{counts[3]}-{counts[4]}"
+
+
+def explain_auto_substitution(
+    starting_xi: list[dict[str, Any]],
+    bench_order: dict[str, Any],
+    absent_player_id: Any,
+) -> dict[str, Any]:
+    """Explain the first legal FPL auto-substitution for one absent starter."""
+    absent = next(
+        (player for player in starting_xi if player.get("id") == absent_player_id),
+        None,
+    )
+    if absent is None:
+        return {
+            "status": "invalid",
+            "reason": "The absent player is not in the Starting XI.",
+            "replacement": None,
+        }
+
+    remaining = [
+        player for player in starting_xi if player.get("id") != absent_player_id
+    ]
+    if absent.get("element_type") == 1:
+        goalkeeper = bench_order.get("goalkeeper")
+        if goalkeeper is not None:
+            resulting_xi = remaining + [goalkeeper]
+            if _is_legal_fpl_xi(resulting_xi):
+                return {
+                    "status": "replaced",
+                    "absent_player": absent,
+                    "replacement": goalkeeper,
+                    "replacement_slot": "Bench GK",
+                    "resulting_formation": _formation_label_for_xi(resulting_xi),
+                    "skipped_candidates": [],
+                    "reason": (
+                        f"{goalkeeper.get('web_name', 'Bench GK')} replaces the "
+                        "absent goalkeeper from Bench GK."
+                    ),
+                }
+        return {
+            "status": "no_legal_substitute",
+            "absent_player": absent,
+            "replacement": None,
+            "replacement_slot": None,
+            "resulting_formation": None,
+            "skipped_candidates": [],
+            "reason": "No separate bench goalkeeper can produce a legal XI.",
+        }
+
+    skipped_candidates = []
+    for index, candidate in enumerate(
+        bench_order.get("substitutes", []), 1
+    ):
+        resulting_xi = remaining + [candidate]
+        if _is_legal_fpl_xi(resulting_xi):
+            return {
+                "status": "replaced",
+                "absent_player": absent,
+                "replacement": candidate,
+                "replacement_slot": f"{index}SUB",
+                "resulting_formation": _formation_label_for_xi(resulting_xi),
+                "skipped_candidates": skipped_candidates,
+                "reason": (
+                    f"{candidate.get('web_name', 'Bench player')} enters from "
+                    f"{index}SUB and preserves a legal "
+                    f"{_formation_label_for_xi(resulting_xi)}."
+                ),
+            }
+        skipped_candidates.append(
+            {
+                "slot": f"{index}SUB",
+                "player": candidate,
+                "reason": "would leave an illegal goalkeeper/position balance",
+            }
+        )
+
+    return {
+        "status": "no_legal_substitute",
+        "absent_player": absent,
+        "replacement": None,
+        "replacement_slot": None,
+        "resulting_formation": None,
+        "skipped_candidates": skipped_candidates,
+        "reason": "No outfield bench player can produce a legal XI.",
     }
 
 

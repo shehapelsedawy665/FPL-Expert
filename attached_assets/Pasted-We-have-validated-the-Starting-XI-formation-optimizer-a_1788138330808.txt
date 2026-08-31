@@ -1,0 +1,93 @@
+We have validated the Starting XI formation optimizer against live FPL Team ID 4107702. The next task is to build a proper Bench Order Engine.
+Objective
+Improve the recommendation for the three outfield bench positions:
+1SUB → 2SUB → 3SUB
+The substitute goalkeeper must remain separate as Bench GK.
+Do NOT change the Starting XI optimizer or the existing Expert Score model in this task.
+Core principle
+Bench order must NOT simply be the remaining outfield players sorted by Expert Score.
+The purpose of bench priority is:
+If a starter unexpectedly does not play, which available bench player gives us the best expected FPL replacement value?
+Therefore availability / likelihood of actually playing and expected next-GW performance are more important than historical points alone.
+First: inspect existing data
+Before implementing anything, inspect the current project and report which of these signals already exist for every player:
+Expert Score
+expected minutes
+chance/status/availability
+next-GW fixture
+fixture difficulty
+next-GW projection or equivalent future score
+current form
+xG / xA / xGI
+starts/minutes history
+Reuse existing calculated signals wherever possible.
+Do NOT invent unavailable data.
+Do NOT duplicate a factor if it is already incorporated into an existing projection.
+Bench Priority V1
+Build a deterministic Bench Priority Score for OUTFIELD substitutes.
+Its priority hierarchy should be:
+Expected availability / expected minutes
+Expected performance for the NEXT gameweek
+Existing Expert Score as a supporting/tie-breaking signal
+Historical form, xG, xA and fixture difficulty should NOT automatically be added again if they are already components of the existing Expert/Future projection.
+Avoid arbitrary new weights unless the current scoring architecture already provides justified weights.
+If the existing project does not contain a reliable next-GW expected-points metric, clearly report that limitation rather than pretending that one exists.
+Availability handling
+A high-scoring player with a serious minutes/availability risk should not automatically be 1SUB.
+Use the strongest existing availability/minutes information in the project.
+Do not hard-code individual player statuses.
+FPL formation rules
+Preserve official FPL substitution constraints.
+A legal XI after substitutions must contain:
+exactly 1 goalkeeper
+at least 3 defenders
+at least 2 midfielders
+at least 1 forward
+Bench order itself remains 1SUB, 2SUB, 3SUB.
+Do not manipulate bench order merely to force every possible substitution to produce a legal formation; FPL auto-substitution rules determine whether a particular bench player can replace a missing starter.
+However, the engine should be capable of explaining which bench player would actually enter for example absence scenarios under those rules.
+Output/UI
+Keep:
+Bench GK
+1SUB
+2SUB
+3SUB
+For each outfield substitute, return/store:
+player
+position
+Bench Priority Score
+Expert Score
+availability/minutes signal used
+next-GW performance signal used
+short reason for the ranking
+The UI does not need a major redesign. Update the existing Bench Order section to use the new engine.
+Architecture
+Use ONE authoritative bench-order function/service.
+The backend analysis result and UI must consume the same result.
+Do not implement separate frontend ranking logic.
+Do not hard-code player names, teams, scores, formations or Team ID-specific behavior.
+Tests
+Add tests covering at least:
+normal ranking of three available outfield substitutes
+a high Expert Score player with poor expected minutes
+unavailable/very-low-availability player
+equal or near-equal candidates requiring deterministic tie-breaking
+defender substitution where minimum 3 DEF must be preserved
+MID/FWD absence scenarios
+goalkeeper handled separately
+exactly three ordered outfield substitutes returned
+Existing Starting XI optimizer tests must continue passing.
+Live validation
+After implementation, run it against:
+FPL Team ID 4107702
+Report:
+Starting XI and formation — confirm they did not change because of this task.
+Bench GK.
+The three outfield substitutes BEFORE the new engine.
+Their new Bench Priority Scores and relevant inputs.
+New recommended 1SUB / 2SUB / 3SUB order.
+Explain why each player received that position.
+Show at least three hypothetical starter-absence scenarios and the resulting legal FPL auto-substitution.
+All test results.
+Finally, identify any limitation in the current data/model that prevents the Bench Engine from making a genuinely predictive next-gameweek decision.
+Do not expand scope into transfers, captaincy, or a new prediction model yet.
