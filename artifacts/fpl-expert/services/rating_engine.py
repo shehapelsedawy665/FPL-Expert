@@ -26,6 +26,20 @@ STATUS_AVAILABILITY = {
     "u": 0.0,
 }
 
+EARLY_REGRESSION_KEYS = {
+    "event_points",
+    "form",
+    "points_per_game",
+    "goals_scored",
+    "assists",
+    "bonus",
+    "expected_goals",
+    "expected_assists",
+    "expected_goal_involvements",
+}
+COMPONENT_MIN = 15.0
+COMPONENT_MAX = 85.0
+
 # These weights intentionally differ by FPL position. Each position is scored
 # against its own player pool, so a goalkeeper is never percentile-ranked
 # directly against a midfielder.
@@ -168,22 +182,57 @@ def _percentile(value: float | None, peer_values: list[float]) -> float:
     return clamp(((less_count + (equal_count * 0.5)) / len(valid_values)) * 100)
 
 
+def _evidence_confidence_factor(
+    player: dict[str, Any],
+    reference_gameweek: int,
+) -> float:
+    minutes_evidence = clamp(number_value(player.get("minutes")) / 450.0, 0.0, 1.0)
+    gameweek_evidence = clamp(max(reference_gameweek, 0) / 5.0, 0.0, 1.0)
+    return clamp(minutes_evidence * 0.65 + gameweek_evidence * 0.35, 0.0, 1.0)
+
+
+def _data_confidence(
+    player: dict[str, Any],
+    reference_gameweek: int,
+) -> tuple[float, str]:
+    confidence = _evidence_confidence_factor(player, reference_gameweek)
+    if confidence >= 0.72:
+        return round(confidence * 100, 1), "High"
+    if confidence >= 0.40:
+        return round(confidence * 100, 1), "Medium"
+    return round(confidence * 100, 1), "Low"
+
+
+def _metric_score(
+    player: dict[str, Any],
+    peers: list[dict[str, Any]],
+    key: str,
+    reference_gameweek: int,
+) -> float:
+    peer_values = [
+        value
+        for peer in peers
+        if (value := _raw_value(peer, key)) is not None
+    ]
+    score = _percentile(_raw_value(player, key), peer_values)
+    if key in EARLY_REGRESSION_KEYS and reference_gameweek < 5:
+        confidence = _evidence_confidence_factor(player, reference_gameweek)
+        score = 50.0 + ((score - 50.0) * confidence)
+    return clamp(score, COMPONENT_MIN, COMPONENT_MAX)
+
+
 def _weighted_percentile(
     player: dict[str, Any],
     peers: list[dict[str, Any]],
     weights: dict[str, float],
+    reference_gameweek: int,
 ) -> float:
     total_weight = sum(weights.values())
     if total_weight <= 0:
         return 50.0
     score = 0.0
     for key, weight in weights.items():
-        peer_values = [
-            value
-            for peer in peers
-            if (value := _raw_value(peer, key)) is not None
-        ]
-        score += _percentile(_raw_value(player, key), peer_values) * weight
+        score += _metric_score(player, peers, key, reference_gameweek) * weight
     return clamp(score / total_weight)
 
 
@@ -212,6 +261,7 @@ def _availability_penalty(player: dict[str, Any]) -> float:
 def _minutes_profile(
     player: dict[str, Any],
     reference_gameweek: int,
+    recent_history: list[dict[str, Any]] | None = None,
 ) -> tuple[float, float]:
     gameweeks_played = max(1, reference_gameweek)
     expected_minutes = gameweeks_played * 90
@@ -229,7 +279,34 @@ def _minutes_profile(
         + starts_rate * 0.30
         + appearances_rate * 0.15
     )
-    return clamp(minutes_proxy), clamp(minutes_proxy * 0.65 + _chance_score(player) * 0.35)
+    recent_security = None
+    if recent_history:
+        recent_matches = [
+            item
+            for item in recent_history
+            if isinstance(item, dict) and item.get("minutes") is not None
+        ][-5:]
+        if recent_matches:
+            minute_rates = [
+                clamp((number_value(item.get("minutes")) / 90.0) * 100)
+                for item in recent_matches
+            ]
+            average_minutes = sum(minute_rates) / len(minute_rates)
+            deviation = sum(
+                abs(rate - average_minutes) for rate in minute_rates
+            ) / len(minute_rates)
+            consistency = clamp(100.0 - deviation)
+            recent_security = clamp(
+                average_minutes * 0.75
+                + average_minutes * (consistency / 100.0) * 0.25
+            )
+    if recent_security is None:
+        recent_security = minutes_proxy
+    return clamp(minutes_proxy), clamp(
+        minutes_proxy * 0.45
+        + recent_security * 0.35
+        + _chance_score(player) * 0.20
+    )
 
 
 def _fixture_score(player: dict[str, Any]) -> float:
@@ -348,28 +425,34 @@ def _player_rating(
     position_peers: list[dict[str, Any]],
     all_players: list[dict[str, Any]],
     reference_gameweek: int,
+    recent_history: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     position = player.get("element_type")
     if position not in CURRENT_WEIGHTS:
         position = 3
 
     current_form_score = _weighted_percentile(
-        player, position_peers, CURRENT_WEIGHTS[position]
+        player, position_peers, CURRENT_WEIGHTS[position], reference_gameweek
     )
     attacking_score = _weighted_percentile(
-        player, position_peers, ATTACKING_WEIGHTS[position]
+        player,
+        position_peers,
+        ATTACKING_WEIGHTS[position],
+        reference_gameweek,
     )
-    minutes_proxy, minutes_security = _minutes_profile(player, reference_gameweek)
+    minutes_proxy, minutes_security = _minutes_profile(
+        player, reference_gameweek, recent_history
+    )
     fixture_score = _fixture_score(player)
     context_score = _team_context_score(player, all_players)
     chance_score = _chance_score(player)
     availability_penalty = _availability_penalty(player)
     future_fpl_score = clamp(
-        fixture_score * 0.40
-        + attacking_score * 0.30
+        fixture_score * 0.42
+        + attacking_score * 0.34
         + minutes_security * 0.20
-        + context_score * 0.05
-        + chance_score * 0.05
+        + context_score * 0.02
+        + chance_score * 0.02
     )
 
     price = max(number_value(player.get("now_cost")) / 10.0, 0.1)
@@ -383,22 +466,29 @@ def _player_rating(
         )
         for peer in position_peers
     ]
-    value_score = _percentile(value_ratio, value_ratios)
-    minutes_penalty = round(max(0.0, (45.0 - minutes_proxy) * 0.10), 2)
+    value_percentile = _percentile(value_ratio, value_ratios)
+    confidence_factor = _evidence_confidence_factor(player, reference_gameweek)
+    value_score = clamp(
+        50.0
+        + (value_percentile - 50.0)
+        * 0.55
+        * max(0.35, confidence_factor)
+    )
+    minutes_penalty = round(max(0.0, (50.0 - minutes_proxy) * 0.16), 2)
     weighted_score = (
-        current_form_score * 0.35
-        + future_fpl_score * 0.50
-        + value_score * 0.15
+        current_form_score * 0.37
+        + future_fpl_score * 0.55
+        + value_score * 0.08
     )
     expert_score = clamp(weighted_score - availability_penalty - minutes_penalty)
 
     breakdown = {
-        "form_contribution": round(current_form_score * 0.35, 1),
-        "fixture_contribution": round(fixture_score * 0.50 * 0.40, 1),
-        "attacking_contribution": round(attacking_score * 0.50 * 0.30, 1),
-        "minutes_security_contribution": round(minutes_security * 0.50 * 0.20, 1),
-        "context_contribution": round(context_score * 0.50 * 0.05, 1),
-        "value_contribution": round(value_score * 0.15, 1),
+        "form_contribution": round(current_form_score * 0.37, 1),
+        "fixture_contribution": round(fixture_score * 0.55 * 0.42, 1),
+        "attacking_contribution": round(attacking_score * 0.55 * 0.34, 1),
+        "minutes_security_contribution": round(minutes_security * 0.55 * 0.20, 1),
+        "context_contribution": round(context_score * 0.55 * 0.02, 1),
+        "value_contribution": round(value_score * 0.08, 1),
         "availability_penalty": availability_penalty,
         "minutes_penalty": minutes_penalty,
         "weighted_before_penalties": round(weighted_score, 1),
@@ -415,6 +505,10 @@ def _player_rating(
         "attacking_score": round(attacking_score, 1),
         "availability_score": round(chance_score, 1),
         "rating_breakdown": breakdown,
+        "data_confidence_score": _data_confidence(
+            player, reference_gameweek
+        )[0],
+        "data_confidence": _data_confidence(player, reference_gameweek)[1],
         "rating_explanation": _explanation(
             fixture_score,
             attacking_score,
@@ -430,6 +524,7 @@ def add_ratings(
     players: list[dict[str, Any]],
     *,
     reference_gameweek: int,
+    recent_history_by_player: dict[int, list[dict[str, Any]]] | None = None,
 ) -> list[dict[str, Any]]:
     """Return every player with deterministic, position-relative scores."""
     by_position: dict[Any, list[dict[str, Any]]] = {}
@@ -445,17 +540,25 @@ def add_ratings(
         peers = by_position.get(position, [player])
         fixture_score = _fixture_score(player_copy)
         attacking_score = _weighted_percentile(
-            player_copy, peers, ATTACKING_WEIGHTS.get(position, ATTACKING_WEIGHTS[3])
+            player_copy,
+            peers,
+            ATTACKING_WEIGHTS.get(position, ATTACKING_WEIGHTS[3]),
+            reference_gameweek,
         )
-        _, minutes_security = _minutes_profile(player_copy, reference_gameweek)
+        recent_history = (
+            recent_history_by_player or {}
+        ).get(player_copy.get("id"))
+        _, minutes_security = _minutes_profile(
+            player_copy, reference_gameweek, recent_history
+        )
         chance_score = _chance_score(player_copy)
         context_score = _team_context_score(player_copy, players)
         player_copy["future_fpl_score"] = clamp(
-            fixture_score * 0.40
-            + attacking_score * 0.30
+            fixture_score * 0.42
+            + attacking_score * 0.34
             + minutes_security * 0.20
-            + context_score * 0.05
-            + chance_score * 0.05
+            + context_score * 0.02
+            + chance_score * 0.02
         )
         prepared_players.append(player_copy)
 
@@ -471,6 +574,7 @@ def add_ratings(
             prepared_by_position.get(position, [player]),
             prepared_players,
             reference_gameweek,
+            (recent_history_by_player or {}).get(player.get("id")),
         )
         player_copy = dict(player)
         player_copy.update(rated)

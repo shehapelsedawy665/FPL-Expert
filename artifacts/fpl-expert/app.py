@@ -54,7 +54,7 @@ def home():
     return render_template("index.html")
 
 
-def live_rated_players():
+def live_rated_players(recent_history_by_player=None):
     bootstrap = fetch_bootstrap_data()
     fixtures = fetch_fixtures()
     enriched_players = add_fixture_data(
@@ -66,6 +66,7 @@ def live_rated_players():
     rated_players = add_ratings(
         enriched_players,
         reference_gameweek=bootstrap.reference_gameweek,
+        recent_history_by_player=recent_history_by_player,
     )
     return bootstrap, rated_players
 
@@ -122,12 +123,10 @@ def players():
 @app.get("/player/<int:player_id>")
 def player_detail(player_id: int):
     try:
-        bootstrap, rated_players = live_rated_players()
-        player = next(
-            (player for player in rated_players if player.get("id") == player_id),
-            None,
-        )
-        if player is None:
+        bootstrap = fetch_bootstrap_data()
+        if not any(
+            player.get("id") == player_id for player in bootstrap.players
+        ):
             raise NotFound
 
         summary = fetch_player_summary(player_id)
@@ -136,6 +135,16 @@ def player_detail(player_id: int):
         ]
         history = add_history_team_names(history, bootstrap.teams)
         history.sort(key=lambda item: item.get("round") or 0, reverse=True)
+
+        bootstrap, rated_players = live_rated_players(
+            recent_history_by_player={player_id: history}
+        )
+        player = next(
+            (item for item in rated_players if item.get("id") == player_id), None
+        )
+        if player is None:
+            raise NotFound
+
         return render_template(
             "player_detail.html",
             player=player,

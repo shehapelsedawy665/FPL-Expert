@@ -1,0 +1,34 @@
+Refine the existing FPL Expert rating engine. Do NOT add new features yet.
+The current rankings overvalue cheap players and small-sample early-season form.
+Make these changes:
+Reduce Value Score weight in Expert Score from 15% to 8%.
+New Expert Score:
+37% Current Form Score
+55% Future FPL Score
+8% Value Score
+Value Score must NOT simply reward low price. It should measure performance/expected performance relative to price, but cap the value advantage so cheap players cannot dominate the overall ranking mainly because they are cheap.
+Add EARLY-SEASON SAMPLE-SIZE REGRESSION. When fewer than 5 gameweeks have been played, reduce confidence in:
+form
+points per game
+goals
+assists
+bonus
+xG/xA/xGI percentiles
+Blend early-season player performance toward the positional average. Confidence should increase progressively as more minutes/gameweeks are accumulated.
+Strengthen minutes security. Use available season minutes and recent history. Players consistently playing close to 90 minutes should receive higher security. Players with uncertain/reduced minutes must be penalized.
+Future FPL Score should prioritize forward-looking factors over ownership/popularity. Reduce the importance of ownership and transfer trends. Ownership must NOT directly make a player a strong FPL pick.
+For attacking players, make underlying expected performance important: MID: xGI, xG, xA, threat, creativity, minutes security and upcoming fixtures.
+FWD: xG, xGI, threat, minutes security and upcoming fixtures.
+Do not let one metric create an extreme score by itself. Apply sensible caps to individual components.
+Add a "Data Confidence" score:
+Low
+Medium
+High
+Base it mainly on accumulated minutes and number of gameweeks of evidence.
+Display Data Confidence next to Expert Score.
+Keep position-specific normalization.
+Recalculate all players and test the top 20 Expert Score ranking.
+Specifically inspect whether cheap players with limited evidence are being incorrectly pushed above stronger FPL assets primarily because of Value Score.
+Keep the rating transparent and deterministic. Do not use mock data or subjective AI scores.
+Do NOT implement Buy/Sell, captaincy or AI recommendations yet.
+After fixing and testing the rating engine, stop.

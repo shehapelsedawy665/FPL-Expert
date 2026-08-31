@@ -51,6 +51,7 @@
             <div class="rating-hero-score">
               <strong>{{ player.expert_score|decimal(1) }}</strong>
               <span>{{ player.rating_label|display }}</span>
+              <small>Data confidence: {{ player.data_confidence|display }}</small>
             </div>
           </div>
           <p class="rating-explanation">{{ player.rating_explanation|display }}</p>

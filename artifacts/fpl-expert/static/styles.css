@@ -334,6 +334,29 @@ p {
   font-weight: 800;
 }
 
+.confidence-label {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 0.2rem 0.45rem;
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.confidence-high {
+  color: #d7ffe3;
+  background: rgba(74, 222, 128, 0.12);
+}
+
+.confidence-medium {
+  color: #fde68a;
+  background: rgba(250, 204, 21, 0.12);
+}
+
+.confidence-low {
+  color: #fdba74;
+  background: rgba(251, 146, 60, 0.12);
+}
+
 .fixture-list {
   min-width: 190px;
   max-width: 260px;
@@ -470,6 +493,12 @@ p {
   color: #d7ffe3;
   font-size: 0.75rem;
   font-weight: 800;
+}
+
+.rating-hero-score small {
+  color: #91a6c0;
+  font-size: 0.68rem;
+  font-weight: 700;
 }
 
 .rating-explanation {

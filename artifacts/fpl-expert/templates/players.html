@@ -114,6 +114,7 @@
                   <th scope="col">Team</th>
                   <th scope="col">Position</th>
                   <th scope="col">Expert Score /100</th>
+                  <th scope="col">Data Confidence</th>
                   <th scope="col">Current Form Score /100</th>
                   <th scope="col">Future FPL Score /100</th>
                   <th scope="col">Value Score /100</th>
@@ -161,6 +162,7 @@
                     </td>
                     <td data-label="Position">{{ player.position_short_name or player.position_name|display }}</td>
                     <td data-label="Expert Score /100" class="rating-number">{{ player.expert_score|decimal(1) }}</td>
+                    <td data-label="Data Confidence"><span class="confidence-label confidence-{{ player.data_confidence|lower }}">{{ player.data_confidence|display }}</span></td>
                     <td data-label="Current Form Score /100">{{ player.current_form_score|decimal(1) }}</td>
                     <td data-label="Future FPL Score /100">{{ player.future_fpl_score|decimal(1) }}</td>
                     <td data-label="Value Score /100">{{ player.value_score|decimal(1) }}</td>
