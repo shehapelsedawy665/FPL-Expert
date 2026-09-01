@@ -1,0 +1,120 @@
+Approved.
+
+Implement ONLY:
+
+# Phase 0 — Prediction contract and acceptance criteria
+
+from the approved V2 Implementation Plan.
+
+Do NOT implement Phase 1 or any later phase yet.
+
+IMPORTANT:
+Preserve the existing working application and existing user-facing behavior.
+Phase 0 is infrastructure/contract work only.
+
+Implement the Phase 0 specification exactly as planned:
+
+1. Define last_finished_gameweek.
+2. Define prediction_gameweek.
+3. Define the historical-data cutoff so incomplete current Gameweek results cannot leak into next-Gameweek predictions.
+4. Create a clear separation between:
+   - expected_points_next_gameweek
+   - expert_rank_score
+5. Define the prediction output schema, including future support for:
+   - expected points
+   - expected minutes
+   - P(available)
+   - P(appearance)
+   - P(start)
+   - P(60+ minutes)
+   - prediction confidence
+   - prediction range
+6. Define explicit data-validity states:
+   - observed
+   - observed_zero
+   - derived
+   - missing
+   - invalid
+   - not_applicable
+7. Create deterministic fixed snapshot fixtures for testing.
+8. Establish route-consistency requirements so the same snapshot must produce the same prediction contract regardless of which page/route requests it.
+
+Architecture:
+
+Create the planned prediction contract module, preferably:
+
+services/prediction_contract.py
+
+and integrate only the minimum necessary contract infrastructure with the existing application.
+
+Do NOT build the actual V2 prediction model yet.
+
+Do NOT generate fake expected points.
+
+If expected_points_next_gameweek is not implemented yet, represent it explicitly as unavailable/not-calculated according to the new contract.
+
+Never populate it with the existing 0–100 Future FPL Score.
+
+The existing Expert Score may continue operating as the current legacy ranking system during the transition.
+
+Clearly label internally that it is a ranking score, not expected FPL points.
+
+GAMEWEEK BOUNDARY:
+
+The contract must dynamically identify:
+
+- last_finished_gameweek
+- prediction_gameweek
+
+Do not hard-code Gameweek numbers.
+
+If a Gameweek is currently in progress, its partial player performance must NOT be treated as completed historical evidence for predicting the next Gameweek.
+
+MISSINGNESS:
+
+The contract must preserve the difference between:
+
+0
+
+and
+
+missing/unknown.
+
+Do not globally change existing scoring behavior yet — that belongs to Phase 1.
+
+This Phase should establish the contract/types/helpers that Phase 1 will use.
+
+TESTS:
+
+Implement all Phase 0 tests from the approved plan:
+
+- contract/schema validation
+- Gameweek boundary tests
+- incomplete-current-GW leakage protection
+- missing versus observed-zero tests
+- deterministic snapshot replay tests
+- route-independent contract tests
+
+Run the complete existing test suite as well.
+
+No existing tests should regress.
+
+WHEN FINISHED:
+
+Report:
+
+1. Exact files created.
+2. Exact files modified.
+3. The final prediction contract/schema.
+4. How last_finished_gameweek is determined.
+5. How prediction_gameweek is determined.
+6. How an in-progress Gameweek is handled.
+7. How observed zero differs from missing.
+8. How expected_points_next_gameweek is represented before the V2 points model exists.
+9. New tests added and their results.
+10. Full existing test-suite result.
+11. Confirm explicitly that Phase 1 was NOT implemented.
+
+Then STOP.
+
+Do not continue to Phase 1 without my approval.

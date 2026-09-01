@@ -7,6 +7,11 @@ from typing import Any
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from services.prediction_contract import (
+    GameweekBoundary,
+    determine_gameweek_boundary,
+)
+
 
 FPL_BOOTSTRAP_URL = "https://fantasy.premierleague.com/api/bootstrap-static/"
 FPL_FIXTURES_URL = "https://fantasy.premierleague.com/api/fixtures/"
@@ -71,6 +76,7 @@ class FPLBootstrap:
     positions: list[dict[str, Any]]
     events: list[dict[str, Any]]
     reference_gameweek: int
+    gameweek_boundary: GameweekBoundary | None = None
 
 
 _response_cache = TTLCache(FPL_CACHE_TTL_SECONDS)
@@ -184,6 +190,7 @@ def fetch_bootstrap_data() -> FPLBootstrap:
         positions=positions,
         events=events,
         reference_gameweek=_reference_gameweek(events),
+        gameweek_boundary=determine_gameweek_boundary(events),
     )
     _response_cache.set("bootstrap", bootstrap)
     return bootstrap
