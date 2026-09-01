@@ -1,0 +1,97 @@
+Before we continue to Captaincy or Transfers, STOP feature development and perform a full audit of the predictive data layer currently used by the FPL Expert.
+Do NOT modify the application yet.
+We need to understand exactly what the current numbers mean and whether they are genuinely predictive.
+Audit the live calculation pipeline and report:
+1. Expert Score
+Show the exact formula/calculation used to produce Expert Score.
+List every component, normalization, weight, fallback and data source.
+Explain whether it is primarily:
+historical performance,
+current form,
+future-looking,
+or a mixture.
+2. Next-Gameweek Projection
+Show the exact calculation that produced examples such as:
+Calafiori 51.8
+Hughes 43.1
+Konsa 38.2
+Explain exactly what the scale means.
+Confirm whether this is actual expected FPL points for the next GW or merely a normalized/proxy score.
+List every input used.
+3. Expected Minutes Proxy
+Audit this especially carefully.
+Explain why the live result produced:
+Calafiori: 39.4
+Hughes: 0.0
+Konsa: 0.0
+while Hughes and Konsa were simultaneously:
+status = available
+official availability score = 100
+Determine whether 0.0 means: A) genuinely projected zero minutes, B) insufficient historical data, C) missing data, D) calculation/fallback behaviour, or something else.
+Missing data MUST NOT silently mean predicted zero minutes.
+4. Data inventory
+For every predictive input currently available in the project, report:
+source/API
+field name
+update frequency if known
+whether historical or future-looking
+whether available for every player
+behaviour when missing
+Include at minimum:
+minutes
+starts
+total points
+form
+points per game
+xG
+xA
+xGI
+ICT-related data if used
+fixture difficulty
+opponent
+home/away
+player availability/status
+chance of playing
+transfers
+price
+team strength
+clean-sheet-related data
+goals conceded
+set pieces / penalties if available
+any external data source currently used
+5. Missing-data audit
+Find every location where missing/null/unavailable data is converted into:
+0
+a neutral value
+a default value
+another proxy
+Report each fallback and whether it can distort player rankings.
+6. Double-counting audit
+Identify whether the current Expert Score or Next-GW Projection double-counts correlated signals.
+For example, total points, form, PPG, xGI and fixture-adjusted metrics may overlap.
+Do not change them yet — just identify the issue.
+7. Predictive capability
+Answer this explicitly:
+“With the data currently available in this application, can we genuinely estimate a player's expected FPL points for the NEXT Gameweek?”
+Answer YES / PARTIALLY / NO and explain why.
+If PARTIALLY or NO, list exactly what additional data or modelling would be required.
+8. Live player trace
+For Team ID 4107702, produce a calculation trace for:
+Calafiori
+Hughes
+Konsa
+Haaland
+Bruno Fernandes
+Raya
+Show raw input → transformations → Expert Score → expected-minutes value → Next-GW projection.
+This is an AUDIT ONLY.
+Do not alter scoring formulas, bench ordering, Starting XI, UI, database schema or other features.
+Finish with a section called:
+RECOMMENDED PREDICTION ENGINE V2
+Describe how you would redesign the model so that it estimates:
+probability of starting,
+expected minutes,
+expected FPL points conditional on playing,
+final next-GW expected points,
+while avoiding data leakage, missing-data-as-zero errors and double counting.
+Do not implement V2 yet. Wait for approval.
