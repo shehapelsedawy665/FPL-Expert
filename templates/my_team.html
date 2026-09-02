@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Import and analyze your current Fantasy Premier League squad."
+    />
+    <title>My Team · FPL Expert</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="players-page team-page">
+      <header class="players-header">
+        <a class="brand-link" href="{{ url_for('home') }}">FPL Expert</a>
+        <div>
+          <div class="eyebrow">SQUAD ANALYZER</div>
+          <h1>My Team</h1>
+          <p class="page-intro">Import your current squad and inspect its live FPL outlook.</p>
+        </div>
+        <a class="back-link" href="{{ url_for('players') }}">All players</a>
+      </header>
+
+      <section class="team-import-card">
+        <div>
+          <div class="eyebrow">LIVE TEAM IMPORT</div>
+          <h2>Analyze your FPL team</h2>
+          <p>Enter your FPL Team ID to import your current squad and get recommendations.</p>
+        </div>
+        <form class="team-id-form" method="get" action="{{ url_for('my_team') }}">
+          <label for="team_id">FPL Team ID</label>
+          <div class="team-id-controls">
+            <input
+              id="team_id"
+              name="team_id"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9]+"
+              value="{{ team_id }}"
+              placeholder="e.g. 123456"
+              aria-describedby="team-id-help"
+              required
+            />
+            <button class="filter-button" type="submit">Analyze Team</button>
+          </div>
+          <small id="team-id-help">Your Team ID is the number in the URL when viewing your FPL team/history.</small>
+        </form>
+      </section>
+
+      {% if error %}
+        <section class="status-panel error-panel team-error" role="alert">
+          <strong>
+            {% if error_category == "invalid" %}Invalid FPL Team ID
+            {% elif error_category == "not_found" %}FPL team not found
+            {% elif error_category == "squad_unavailable" %}Squad unavailable
+            {% else %}FPL team data unavailable{% endif %}
+          </strong>
+          <p>{{ error }}</p>
+        </section>
+      {% endif %}
+
+      {% if summary and analysis %}
+        <section class="team-summary-card">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">TEAM SUMMARY</div>
+              <h2>{{ summary.team_name|display }}</h2>
+              <p class="summary-manager">{{ summary.manager_name|display }}</p>
+            </div>
+            <span class="live-indicator"><span aria-hidden="true"></span>Live from FPL</span>
+          </div>
+          <div class="team-summary-grid">
+            <div><span>Overall rank</span><strong>{{ summary.overall_rank|display }}</strong></div>
+            <div><span>Total points</span><strong>{{ summary.total_points|display }}</strong></div>
+            <div><span>Gameweek</span><strong>{{ summary.gameweek|display }}</strong></div>
+            <div><span>Bank</span><strong>{{ summary.bank|price }}</strong></div>
+            <div><span>Squad value</span><strong>{{ summary.squad_value|price }}</strong></div>
+            <div><span>Players imported</span><strong>{{ squad_count }}/15</strong></div>
+          </div>
+        </section>
+
+        <section class="team-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">CURRENT SQUAD</div>
+              <h2>15 players</h2>
+            </div>
+          </div>
+          <div class="squad-groups">
+            {% for group in analysis.groups %}
+              <section class="squad-group">
+                <div class="squad-group-heading">
+                  <h3>{{ group.name }}</h3>
+                  <span>{{ group.players|length }}</span>
+                </div>
+                <div class="squad-card-grid">
+                  {% for player in group.players %}
+                    <article class="squad-player-card">
+                      {% if player.missing_data %}
+                        <div class="missing-player">
+                          <strong>Player data unavailable</strong>
+                          <span>FPL player ID {{ player.id|display }}</span>
+                        </div>
+                      {% else %}
+                        <div class="squad-player-topline">
+                          <div>
+                            <a href="{{ url_for('player_detail', player_id=player.id) }}">{{ player.web_name|display }}</a>
+                            <small>{{ player.team_short_name|display }} · {{ player.position_short_name|display }}</small>
+                          </div>
+                          <strong class="team-player-price">{{ player.now_cost|price }}</strong>
+                        </div>
+                        <div class="team-score-strip">
+                          <div><span>Expert</span><strong>{{ player.expert_score|decimal(1) }}</strong></div>
+                          <div><span>Confidence</span><strong class="confidence-{{ player.data_confidence|lower }}">{{ player.data_confidence|display }}</strong></div>
+                        </div>
+                        <div class="team-metric-grid">
+                          <div><span>Form</span><strong>{{ player.current_form_score|decimal(1) }}</strong></div>
+                          <div><span>Future</span><strong>{{ player.future_fpl_score|decimal(1) }}</strong></div>
+                          <div><span>Value</span><strong>{{ player.value_score|decimal(1) }}</strong></div>
+                          <div><span>Points</span><strong>{{ player.total_points|display }}</strong></div>
+                          <div><span>Form</span><strong>{{ player.form|decimal(1) }}</strong></div>
+                          <div><span>Owned</span><strong>{{ player.selected_by_percent|percent }}</strong></div>
+                        </div>
+                        {% set next_fixture = player.next_5_fixtures|first %}
+                        <div class="team-fixture-line">
+                          <span>Next</span>
+                          <strong>
+                            {% if next_fixture %}{{ next_fixture.opponent_short_name|display }} {{ next_fixture.venue|display }} · {{ next_fixture.difficulty|display }}
+                            {% else %}—{% endif %}
+                          </strong>
+                        </div>
+                        <div class="team-fixture-line">
+                          <span>Next 3 / 5 avg</span>
+                          <strong>{{ player.next_3_avg_difficulty|decimal(2) }} / {{ player.next_5_avg_difficulty|decimal(2) }}</strong>
+                        </div>
+                      {% endif %}
+                    </article>
+                  {% endfor %}
+                </div>
+              </section>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="team-section analysis-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">SQUAD ANALYSIS</div>
+              <h2>Team Health</h2>
+            </div>
+          </div>
+          <div class="health-grid">
+            <div><span>Strong picks</span><strong>{{ analysis.health.strong_picks }}</strong></div>
+            <div><span>Weak picks</span><strong>{{ analysis.health.weak_picks }}</strong></div>
+            <div><span>Availability risks</span><strong>{{ analysis.health.injury_risks }}</strong></div>
+            <div><span>Low-confidence evaluations</span><strong>{{ analysis.health.low_confidence }}</strong></div>
+            <div><span>Average squad Expert Score</span><strong>{{ analysis.health.average_squad_score|decimal(1) }}</strong></div>
+            <div><span>Average XI Expert Score</span><strong>{{ analysis.health.average_xi_score|decimal(1) }}</strong></div>
+          </div>
+        </section>
+
+        <section class="team-section recommendation-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">LINEUP ANALYSIS</div>
+              <h2>Recommended Starting XI</h2>
+            </div>
+            <div class="formation-badge">
+              <span>Recommended formation</span>
+              <strong>{{ analysis.starting_xi.formation_label }}</strong>
+            </div>
+          </div>
+          <div class="recommendation-list">
+            {% for player in analysis.starting_xi.players %}
+              <div class="recommendation-row">
+                <span class="recommendation-position">{{ player.position_short_name|display }}</span>
+                <a href="{{ url_for('player_detail', player_id=player.id) }}">{{ player.web_name|display }}</a>
+                <strong>{{ player.expert_score|decimal(1) }}</strong>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="team-section split-analysis">
+          <div>
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">BENCH</div>
+                <h2>Bench order</h2>
+              </div>
+            </div>
+            <div class="recommendation-list">
+              <div class="recommendation-row"><span class="recommendation-position">GK</span><span>Bench GK</span><strong>{{ analysis.bench.goalkeeper.web_name|display if analysis.bench.goalkeeper else "—" }}</strong></div>
+              {% for player in analysis.bench.substitutes %}
+                <div class="recommendation-row bench-priority-row">
+                  <span class="recommendation-position">{{ loop.index }}SUB</span>
+                  <div class="bench-priority-main">
+                    <strong class="bench-player-name">{{ player.web_name|display }}</strong>
+                    <small>{{ player.position_short_name|display }}</small>
+                  </div>
+                  <div class="bench-priority-score">
+                    <span>Priority</span>
+                    <strong>{{ player.bench_priority_score|decimal(1) }}</strong>
+                  </div>
+                  <div class="bench-priority-meta">
+                    <span>Expert {{ player.expert_score|decimal(1) }}</span>
+                    <span>Minutes {{ player.bench_priority_inputs.minutes_security|decimal(1) }}</span>
+                    <span>Next GW {{ player.bench_priority_inputs.next_gameweek_performance_signal|decimal(1) }}</span>
+                  </div>
+                  <p class="bench-priority-reason">{{ player.bench_priority_reason }}</p>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div>
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">CAPTAINCY</div>
+                <h2>Captain & vice captain</h2>
+              </div>
+            </div>
+            <div class="captain-card">
+              <div><span>Captain</span><strong>{{ analysis.captaincy.captain.web_name|display if analysis.captaincy.captain else "—" }}</strong><p>{{ analysis.captaincy.captain_reason }}</p></div>
+              <div><span>Vice captain</span><strong>{{ analysis.captaincy.vice_captain.web_name|display if analysis.captaincy.vice_captain else "—" }}</strong><p>{{ analysis.captaincy.vice_captain_reason }}</p></div>
+            </div>
+          </div>
+        </section>
+
+        {% if analysis.attention %}
+          <section class="team-section attention-section">
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">REVIEW</div>
+                <h2>Attention Required</h2>
+              </div>
+            </div>
+            <div class="attention-list">
+              {% for item in analysis.attention %}
+                <div class="attention-row">
+                  <strong>{{ item.player.web_name|display }}</strong>
+                  <span>{{ item.reason }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          </section>
+        {% endif %}
+      {% endif %}
+    </main>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>
