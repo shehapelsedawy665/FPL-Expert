@@ -94,13 +94,30 @@ async function main() {
     console.log(`\n========================================`);
     console.log(`PLAYER: ${p.web_name} (ID: ${p.id}, Team: ${p.team_name || p.team}, Pos: ${p.position_label || p.element_type})`);
     
-    console.log(`A. Playing Time:`);
-    console.log(`   - expected minutes: ${b.expected_minutes}`);
-    console.log(`   - P(start): ${mb.probabilities.probability_start}`);
-    console.log(`   - P(appearance): ${mb.probabilities.probability_appearance}`);
-    console.log(`   - P(60+): ${mb.probabilities.probability_60_plus_minutes}`);
+    console.log(`A. Playing Time Integration & Equality:`);
+    console.log(`   - Phase 3 expected_minutes: ${minsResult.expected_minutes.value}`);
+    console.log(`   - Phase 4 consumed expected_minutes: ${b.expected_minutes}`);
+    console.log(`   - Phase 3 P(start): ${mb.probabilities.probability_start}`);
+    console.log(`   - Phase 4 fixture P(start): ${b.fixtures[0]?.probability_appearance !== undefined ? mb.probabilities.probability_start : 'N/A'}`);
+    console.log(`   - Phase 3 P(appearance): ${mb.probabilities.probability_appearance}`);
+    console.log(`   - Phase 4 consumed P(appearance): ${b.fixtures[0]?.probability_appearance}`);
+    console.log(`   - Phase 3 P(60+): ${mb.probabilities.probability_60_plus_minutes}`);
+    console.log(`   - Phase 4 consumed P(60+): ${b.fixtures[0]?.probability_60_plus_minutes}`);
+    console.log(`   - EXACT EQUALITY CHECK: expected_minutes match: ${Number(minsResult.expected_minutes.value) === Number(b.expected_minutes)}, P(app) match: ${mb.probabilities.probability_appearance === b.fixtures[0]?.probability_appearance}, P(60+) match: ${mb.probabilities.probability_60_plus_minutes === b.fixtures[0]?.probability_60_plus_minutes}`);
 
-    console.log(`B. Attacking:`);
+    console.log(`\nB. Confidence Component Breakdown:`);
+    const ptConf = Number(minsResult.playing_time_confidence.value);
+    const sampleMatches = b.shrinkage_diagnostics.sample_matches;
+    const sampleMatchFactor = Math.round((1.0 - Math.exp(-sampleMatches / 4.0)) * 1000) / 1000;
+    const sampleMinutes = b.shrinkage_diagnostics.sample_minutes;
+    console.log(`   - Phase 3 playing_time_confidence: ${ptConf}`);
+    console.log(`   - Historical match sample: ${sampleMatches} matches (${sampleMinutes} mins)`);
+    console.log(`   - Sample match factor: 1 - exp(-${sampleMatches}/4) = ${sampleMatchFactor}`);
+    console.log(`   - Baseline weighting formula: ptConf * (0.35 + 0.65 * ${sampleMatchFactor}) = ${ptConf} * ${Math.round((0.35 + 0.65 * sampleMatchFactor)*10000)/10000} = ${epResult.expected_points_confidence.value}`);
+    console.log(`   - Unsupported components penalty: 0.0 (unsupported components: ${JSON.stringify(b.unsupported_components)})`);
+    console.log(`   - Final expected_points_confidence: ${epResult.expected_points_confidence.value}`);
+
+    console.log(`\nC. Attacking:`);
     console.log(`   - shrunk xG/90: ${b.shrinkage_diagnostics.shrunk_xg_per90} (raw: ${b.shrinkage_diagnostics.raw_xg_per90}, prior: ${b.shrinkage_diagnostics.prior_xg_per90})`);
     console.log(`   - expected goals: ${b.expected_goals}`);
     console.log(`   - expected goal points: ${b.expected_goal_points}`);
@@ -108,31 +125,44 @@ async function main() {
     console.log(`   - expected assists: ${b.expected_assists}`);
     console.log(`   - expected assist points: ${b.expected_assist_points}`);
 
-    console.log(`C. Defensive:`);
+    console.log(`\nD. Defensive:`);
     console.log(`   - clean-sheet probability: ${b.probability_clean_sheet}`);
     console.log(`   - expected clean-sheet points: ${b.expected_clean_sheet_points}`);
     console.log(`   - expected goals-conceded deduction: ${b.expected_goals_conceded_deduction}`);
     console.log(`   - defensive-contribution probability: ${b.probability_defensive_contribution_points}`);
     console.log(`   - expected defensive-contribution points: ${b.expected_defensive_contribution_points}`);
+    console.log(`   - DC Diagnostics:`);
+    console.log(`       * DC historical sample: ${b.shrinkage_diagnostics.sample_matches} matches`);
+    console.log(`       * threshold hits: ${b.shrinkage_diagnostics.sample_dc_hits}`);
+    console.log(`       * raw threshold-hit rate: ${b.shrinkage_diagnostics.raw_dc_rate}`);
+    console.log(`       * shrunk DC rate: ${b.shrinkage_diagnostics.shrunk_dc_rate}`);
+    console.log(`       * prior DC rate: ${b.shrinkage_diagnostics.prior_dc_rate}`);
 
-    console.log(`D. GK-Specific:`);
+    console.log(`\nE. GK-Specific:`);
     console.log(`   - expected saves: ${b.expected_saves}`);
     console.log(`   - expected save points: ${b.expected_save_points}`);
     console.log(`   - penalty-save expectation: ${b.expected_penalty_save_points}`);
 
-    console.log(`E. Other Events & Deductions:`);
+    console.log(`\nF. Other Events & Deductions:`);
     console.log(`   - expected bonus: ${b.expected_bonus_points}`);
     console.log(`   - expected cards deductions: yellow: ${b.expected_yellow_card_deduction}, red: ${b.expected_red_card_deduction}`);
     console.log(`   - expected own-goal deduction: ${b.expected_own_goal_deduction}`);
     console.log(`   - expected penalty-miss deduction: ${b.expected_penalty_miss_deduction}`);
 
-    console.log(`F. Total:`);
+    const epBeforeDC = Math.round((Number(epResult.expected_points_next_gameweek.value) - b.expected_defensive_contribution_points) * 100) / 100;
+    const epAfterDC = Number(epResult.expected_points_next_gameweek.value);
+    const dcDelta = Math.round(b.expected_defensive_contribution_points * 100) / 100;
+
+    console.log(`\nG. Total & DC Impact:`);
     console.log(`   - expected appearance points: ${b.expected_appearance_points}`);
     console.log(`   - fixture Expected Points: ${b.fixtures.map(f => f.fixture_expected_points).join(", ")}`);
+    console.log(`   - Expected Points before DC correction: ${epBeforeDC}`);
+    console.log(`   - Expected Points after DC correction: ${epAfterDC}`);
+    console.log(`   - Delta caused by DC: +${dcDelta}`);
     console.log(`   - expected_points_next_gameweek: ${epResult.expected_points_next_gameweek.value} (${epResult.expected_points_next_gameweek.validity})`);
     console.log(`   - expected_points_confidence: ${epResult.expected_points_confidence.value}`);
 
-    console.log(`G. Provenance:`);
+    console.log(`\nH. Provenance:`);
     console.log(`   - snapshot: ${bootstrap.snapshot.snapshot_id}`);
     console.log(`   - cutoff: ${bootstrap.snapshot.boundary.historical_cutoff_gameweek}`);
     console.log(`   - model version: ${epResult.model_version}`);

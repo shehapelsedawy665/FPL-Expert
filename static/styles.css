@@ -1561,3 +1561,140 @@ p {
     display: inline;
   }
 }
+
+/* ==========================================================================
+   PHASE 8 — PRESS ROOM & LIVE AVAILABILITY INTELLIGENCE STYLES
+   ========================================================= */
+
+.live-intel-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+  border-radius: 6px;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.sentiment-breaking_bad {
+  background: rgba(239, 68, 68, 0.18);
+  border: 1px solid rgba(239, 68, 68, 0.5);
+  color: #fca5a5;
+}
+
+.sentiment-uncertainty {
+  background: rgba(245, 158, 11, 0.18);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  color: #fde68a;
+}
+
+.sentiment-positive_boost {
+  background: rgba(34, 197, 94, 0.18);
+  border: 1px solid rgba(34, 197, 94, 0.5);
+  color: #86efac;
+}
+
+.press-feed-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.press-feed-item {
+  border-radius: 0.65rem;
+  padding: 0.85rem 1rem;
+  background: rgba(16, 42, 75, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.16);
+  transition: transform 120ms ease, border-color 120ms ease;
+}
+
+.press-feed-item:hover {
+  transform: translateY(-1px);
+  border-color: rgba(148, 163, 184, 0.3);
+}
+
+.press-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.press-feed-headline {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #ffffff;
+  line-height: 1.35;
+}
+
+.press-feed-quote {
+  margin: 0.4rem 0 0.5rem;
+  color: #cbd5e1;
+  font-size: 0.84rem;
+  font-style: italic;
+  line-height: 1.4;
+  border-left: 2px solid rgba(148, 163, 184, 0.3);
+  padding-left: 0.6rem;
+}
+
+.press-feed-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+}
+
+.press-badge-pill {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.press-room-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1.5rem;
+}
+
+@media (min-width: 900px) {
+  .press-room-grid {
+    grid-template-columns: 1.3fr 0.9fr;
+  }
+}
+
+.press-input-form textarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid rgba(148, 163, 184, 0.28);
+  border-radius: 0.5rem;
+  padding: 0.65rem 0.8rem;
+  background: rgba(10, 25, 47, 0.85);
+  color: #f8fafc;
+  font-family: inherit;
+  font-size: 0.88rem;
+  resize: vertical;
+}
+
+.press-input-form textarea:focus {
+  outline: none;
+  border-color: #4ade80;
+}
+
+.press-actions-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+

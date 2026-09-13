@@ -14,7 +14,9 @@ import {
   FixtureContextItem,
 } from "./prediction_features.js";
 
-export const MINUTES_MODEL_VERSION = "expected-minutes.v1";
+export const MINUTES_MODEL_VERSION_V1 = "expected-minutes.v1";
+export const MINUTES_MODEL_VERSION_V1_1 = "expected-minutes.v1.1";
+export const MINUTES_MODEL_VERSION = MINUTES_MODEL_VERSION_V1_1;
 
 export interface StatusAvailabilityFallback {
   probability: number;
@@ -62,10 +64,12 @@ export interface PositionPriorConfig {
   default_expected_mins_when_started: number;
   default_expected_mins_as_sub: number;
   prior_sample_weight: number;
+  base_prior_weight?: number;
+  adaptation_rate?: number;
 }
 
-export const POSITION_PRIORS: Record<number, PositionPriorConfig> = {
-  // Goalkeepers: higher role stability, lower prior sample weight, 90 mins standard
+// Phase 3.0 Legacy Priors
+export const POSITION_PRIORS_V1: Record<number, PositionPriorConfig> = {
   1: {
     prior_appearance_rate: 0.50,
     prior_start_rate: 0.50,
@@ -74,7 +78,6 @@ export const POSITION_PRIORS: Record<number, PositionPriorConfig> = {
     default_expected_mins_as_sub: 30.0,
     prior_sample_weight: 1.0,
   },
-  // Defenders
   2: {
     prior_appearance_rate: 0.50,
     prior_start_rate: 0.45,
@@ -83,7 +86,6 @@ export const POSITION_PRIORS: Record<number, PositionPriorConfig> = {
     default_expected_mins_as_sub: 22.0,
     prior_sample_weight: 1.5,
   },
-  // Midfielders
   3: {
     prior_appearance_rate: 0.55,
     prior_start_rate: 0.45,
@@ -92,7 +94,6 @@ export const POSITION_PRIORS: Record<number, PositionPriorConfig> = {
     default_expected_mins_as_sub: 24.0,
     prior_sample_weight: 1.5,
   },
-  // Forwards
   4: {
     prior_appearance_rate: 0.55,
     prior_start_rate: 0.45,
@@ -103,13 +104,61 @@ export const POSITION_PRIORS: Record<number, PositionPriorConfig> = {
   },
 };
 
+// Phase 3.1 Adaptive Priors
+export const POSITION_PRIORS_V1_1: Record<number, PositionPriorConfig> = {
+  1: {
+    prior_appearance_rate: 0.50,
+    prior_start_rate: 0.50,
+    prior_60plus_rate_given_start: 0.98,
+    default_expected_mins_when_started: 90.0,
+    default_expected_mins_as_sub: 25.0,
+    prior_sample_weight: 0.5,
+    base_prior_weight: 0.5,
+    adaptation_rate: 0.8,
+  },
+  2: {
+    prior_appearance_rate: 0.50,
+    prior_start_rate: 0.45,
+    prior_60plus_rate_given_start: 0.90,
+    default_expected_mins_when_started: 88.0,
+    default_expected_mins_as_sub: 20.0,
+    prior_sample_weight: 0.8,
+    base_prior_weight: 0.8,
+    adaptation_rate: 0.5,
+  },
+  3: {
+    prior_appearance_rate: 0.52,
+    prior_start_rate: 0.45,
+    prior_60plus_rate_given_start: 0.82,
+    default_expected_mins_when_started: 84.0,
+    default_expected_mins_as_sub: 22.0,
+    prior_sample_weight: 0.8,
+    base_prior_weight: 0.8,
+    adaptation_rate: 0.5,
+  },
+  4: {
+    prior_appearance_rate: 0.52,
+    prior_start_rate: 0.45,
+    prior_60plus_rate_given_start: 0.80,
+    default_expected_mins_when_started: 82.0,
+    default_expected_mins_as_sub: 22.0,
+    prior_sample_weight: 0.8,
+    base_prior_weight: 0.8,
+    adaptation_rate: 0.5,
+  },
+};
+
+export const POSITION_PRIORS = POSITION_PRIORS_V1_1;
+
 const DEFAULT_PRIORS: PositionPriorConfig = {
   prior_appearance_rate: 0.50,
   prior_start_rate: 0.45,
   prior_60plus_rate_given_start: 0.85,
-  default_expected_mins_when_started: 80.0,
+  default_expected_mins_when_started: 85.0,
   default_expected_mins_as_sub: 22.0,
-  prior_sample_weight: 1.5,
+  prior_sample_weight: 0.8,
+  base_prior_weight: 0.8,
+  adaptation_rate: 0.5,
 };
 
 export interface SupportingHistoryEvidence {
@@ -157,6 +206,9 @@ export interface MinutesModelBreakdown {
     fallback_used: boolean;
     fallback_reason: string | null;
     probability_available: number;
+    provenance?: string;
+    override_applied?: boolean;
+    quote_rationale?: string | null;
   };
 
   historical_evidence: SupportingHistoryEvidence;
@@ -513,12 +565,18 @@ export function buildPlayerExpectedMinutes(options: {
   features: CanonicalPlayerFeatures;
   snapshot: PredictionSnapshot;
   history?: Array<Record<string, any>> | null;
+  modelVersion?: string;
 }): PlayerMinutesModelResult {
-  const { player, features, snapshot, history = null } = options;
+  const { player, features, snapshot, history = null, modelVersion = MINUTES_MODEL_VERSION_V1_1 } = options;
+  const isV1 = modelVersion === MINUTES_MODEL_VERSION_V1;
+  const activeModelVersion = isV1 ? MINUTES_MODEL_VERSION_V1 : MINUTES_MODEL_VERSION_V1_1;
+
   const cutoffGw = snapshot.boundary.historical_cutoff_gameweek;
   const predGw = snapshot.boundary.prediction_gameweek;
   const positionId = num(player.element_type || features.team_position.player_position.value || 3);
-  const priors = POSITION_PRIORS[positionId] || DEFAULT_PRIORS;
+  const priors = isV1
+    ? (POSITION_PRIORS_V1[positionId] || POSITION_PRIORS_V1[3])
+    : (POSITION_PRIORS_V1_1[positionId] || DEFAULT_PRIORS);
 
   const supportingEvidence = deriveSupportingHistoryEvidence(history, cutoffGw, priors);
 
@@ -532,7 +590,16 @@ export function buildPlayerExpectedMinutes(options: {
   let fallbackUsed = false;
   let fallbackReason: string | null = null;
 
-  if (officialChance !== null && officialChance !== undefined) {
+  // Phase 8 Availability Override Layer (Press Conference Intelligence)
+  const override = player.availability_override;
+  if (override && typeof override.adjusted_availability_prob === "number") {
+    probAvailable = roundTo(override.adjusted_availability_prob, 4);
+    availValidity = probAvailable === 0 ? DataValidity.OBSERVED_ZERO : DataValidity.DERIVED;
+    availSource = override.provenance || "LIVE_PRESS_CONFERENCE";
+    availReason = override.quote_rationale || `Press conference intelligence override (${override.status}).`;
+    fallbackUsed = false;
+    fallbackReason = null;
+  } else if (officialChance !== null && officialChance !== undefined) {
     probAvailable = roundTo(Number(officialChance) / 100.0, 4);
     availValidity = probAvailable === 0 ? DataValidity.OBSERVED_ZERO : DataValidity.OBSERVED;
     availSource = "fpl_bootstrap";
@@ -550,15 +617,31 @@ export function buildPlayerExpectedMinutes(options: {
   // 2. Shrinkage & Conditional Selection Estimation (P(event | available))
   const sampleSize = supportingEvidence.completed_gameweeks_count;
   const matchWeight = supportingEvidence.total_match_weight;
-  const priorWeight = priors.prior_sample_weight;
 
-  // Base shrunk rates (incorporating recency weights)
+  // Prior sample weight: in v1.1 adaptive decay W(N) = W_base / (1 + lambda * N)
+  const basePriorWeight = isV1
+    ? priors.prior_sample_weight
+    : (priors.base_prior_weight ?? priors.prior_sample_weight);
+  const adaptRate = isV1 ? 0 : (priors.adaptation_rate ?? 0.5);
+  const effectivePriorWeight = isV1
+    ? basePriorWeight
+    : (sampleSize > 0 ? basePriorWeight / (1.0 + adaptRate * sampleSize) : basePriorWeight);
+
+  // Decoupled Appearance Prior Weight & Adaptation for v1.1:
+  // Appearance represents broad squad participation (substitutions, tactical entries, rotation)
+  // and requires higher shrinkage inertia than starting probability.
+  const baseAppPriorWeight = isV1 ? basePriorWeight : 3.5;
+  const adaptRateApp = isV1 ? 0 : 0.20;
+  const effectiveAppPriorWeight = isV1
+    ? basePriorWeight
+    : (sampleSize > 0 ? baseAppPriorWeight / (1.0 + adaptRateApp * sampleSize) : baseAppPriorWeight);
+
   const rawAppRate = sampleSize > 0
     ? roundTo(supportingEvidence.season_appearances / sampleSize, 4)
     : priors.prior_appearance_rate;
   const recencyAppRate = supportingEvidence.recency_appearance_rate ?? rawAppRate;
   const shrunkAppBase = sampleSize > 0
-    ? roundTo((supportingEvidence.effective_appearances + priorWeight * priors.prior_appearance_rate) / (matchWeight + priorWeight), 4)
+    ? roundTo((supportingEvidence.effective_appearances + effectiveAppPriorWeight * priors.prior_appearance_rate) / (matchWeight + effectiveAppPriorWeight), 4)
     : priors.prior_appearance_rate;
 
   const rawStartRate = sampleSize > 0
@@ -566,7 +649,7 @@ export function buildPlayerExpectedMinutes(options: {
     : priors.prior_start_rate;
   const recencyStartRate = supportingEvidence.recency_start_rate ?? rawStartRate;
   const shrunkStartBase = sampleSize > 0
-    ? roundTo((supportingEvidence.effective_starts + priorWeight * priors.prior_start_rate) / (matchWeight + priorWeight), 4)
+    ? roundTo((supportingEvidence.effective_starts + effectivePriorWeight * priors.prior_start_rate) / (matchWeight + effectivePriorWeight), 4)
     : priors.prior_start_rate;
 
   // 60+ Rate Given Start
@@ -574,7 +657,7 @@ export function buildPlayerExpectedMinutes(options: {
     ? roundTo(supportingEvidence.season_sixty_plus_appearances / supportingEvidence.season_starts, 4)
     : priors.prior_60plus_rate_given_start;
   const shrunk60PlusRate = supportingEvidence.season_starts > 0
-    ? roundTo((supportingEvidence.season_starts * raw60PlusRate + priorWeight * priors.prior_60plus_rate_given_start) / (supportingEvidence.season_starts + priorWeight), 4)
+    ? roundTo((supportingEvidence.season_starts * raw60PlusRate + effectivePriorWeight * priors.prior_60plus_rate_given_start) / (supportingEvidence.season_starts + effectivePriorWeight), 4)
     : priors.prior_60plus_rate_given_start;
 
   // Role-state & Streak Adjustments for Conditional Probabilities
@@ -597,39 +680,61 @@ export function buildPlayerExpectedMinutes(options: {
     let deltaApp = 0.0;
     let deltaAppBench = 0.0;
 
-    if (positionId === 1) {
-      // Goalkeepers: almost 0 rotation for designated starting keeper
-      if (cStarts >= 1) {
-        deltaStart = Math.min(0.25, 0.10 * cStarts);
+    if (isV1) {
+      if (positionId === 1) {
+        if (cStarts >= 1) deltaStart = Math.min(0.25, 0.10 * cStarts);
+        if (cZero >= 1) deltaBench = Math.min(0.30, 0.15 * cZero);
+        if (cApps >= 1) deltaApp = Math.min(0.25, 0.10 * cApps);
+        if (cZero >= 1) deltaAppBench = Math.min(0.30, 0.15 * cZero);
+      } else {
+        if (cStarts >= 1) deltaStart = Math.min(0.18, 0.06 * cStarts * minsRatio);
+        if (cZero >= 1) deltaBench = Math.min(0.20, 0.08 * cZero);
+        if (cApps >= 1) deltaApp = Math.min(0.12, 0.04 * cApps);
+        if (cZero >= 1) deltaAppBench = Math.min(0.20, 0.08 * cZero);
       }
-      if (cZero >= 1) {
-        deltaBench = Math.min(0.30, 0.15 * cZero);
-      }
-      if (cApps >= 1) {
-        deltaApp = Math.min(0.25, 0.10 * cApps);
-      }
-      if (cZero >= 1) {
-        deltaAppBench = Math.min(0.30, 0.15 * cZero);
-      }
+      condStartProb = roundTo(Math.min(0.98, Math.max(0.02, shrunkStartBase + deltaStart - deltaBench)), 4);
+      condAppProb = roundTo(Math.min(0.99, Math.max(0.05, Math.max(condStartProb, shrunkAppBase + deltaApp - deltaAppBench))), 4);
+      cond60Prob = roundTo(Math.min(condStartProb, condStartProb * shrunk60PlusRate), 4);
     } else {
-      // Outfielders (DEF, MID, FWD)
-      if (cStarts >= 1) {
-        deltaStart = Math.min(0.18, 0.06 * cStarts * minsRatio);
+      // Phase 3.1 Adaptive Role-State Logic
+      if (positionId === 1) {
+        // Goalkeepers: decisive role assignment
+        if (cStarts >= 1) {
+          deltaStart = Math.min(0.25, 0.12 + 0.06 * (cStarts - 1));
+          deltaApp = deltaStart;
+        }
+        if (cZero >= 1) {
+          deltaBench = Math.min(0.40, 0.20 + 0.10 * (cZero - 1));
+          deltaAppBench = deltaBench;
+        }
+      } else {
+        // Outfielders:
+        // Strong starter reinforcement when starting consistently with high minutes
+        if (cStarts >= 1) {
+          const fullMatchMultiplier = minsRatio >= 0.90 ? 1.15 : minsRatio;
+          deltaStart = Math.min(0.20, (0.08 + 0.04 * (cStarts - 1)) * fullMatchMultiplier);
+          deltaApp = deltaStart;
+        }
+        // Zero-minute bench decay: calibrated progressive decay
+        if (cZero >= 1) {
+          deltaBench = Math.min(0.30, 0.12 + 0.08 * (cZero - 1));
+          deltaAppBench = Math.min(0.25, 0.05 * cZero);
+        }
+        // Substitute appearance reinforcement (app without start):
+        // Moderate boost so super-subs stabilize around empirical rate (~0.68-0.75)
+        if (cApps >= 1 && cStarts === 0) {
+          deltaApp = Math.min(0.12, 0.05 * Math.min(2, cApps));
+          deltaBench += 0.05; // super-sub low start probability
+        }
       }
-      if (cZero >= 1) {
-        deltaBench = Math.min(0.20, 0.08 * cZero);
-      }
-      if (cApps >= 1) {
-        deltaApp = Math.min(0.12, 0.04 * cApps);
-      }
-      if (cZero >= 1) {
-        deltaAppBench = Math.min(0.20, 0.08 * cZero);
-      }
-    }
 
-    condStartProb = roundTo(Math.min(0.98, Math.max(0.02, shrunkStartBase + deltaStart - deltaBench)), 4);
-    condAppProb = roundTo(Math.min(0.99, Math.max(0.05, Math.max(condStartProb, shrunkAppBase + deltaApp - deltaAppBench))), 4);
-    cond60Prob = roundTo(Math.min(condStartProb, condStartProb * shrunk60PlusRate), 4);
+      condStartProb = roundTo(Math.min(0.98, Math.max(0.01, shrunkStartBase + deltaStart - deltaBench)), 4);
+      const progressiveFloor = positionId === 1
+        ? (cZero >= 1 ? 0.01 : 0.05)
+        : (cZero >= 5 ? 0.02 : cZero >= 3 ? 0.05 : cZero >= 2 ? 0.10 : cZero === 1 ? 0.18 : 0.05);
+      condAppProb = roundTo(Math.min(0.99, Math.max(progressiveFloor, Math.max(condStartProb, shrunkAppBase + deltaApp - deltaAppBench))), 4);
+      cond60Prob = roundTo(Math.min(condStartProb, condStartProb * shrunk60PlusRate), 4);
+    }
   }
 
   // Enforce conditional invariant: 0 <= P(60+|avail) <= P(start|avail) <= P(app|avail) <= 1.0
@@ -669,18 +774,28 @@ export function buildPlayerExpectedMinutes(options: {
     ptConfidenceVal = 0.0;
     confidenceValidity = DataValidity.MISSING;
   } else {
-    sampleFactor = roundTo(1.0 - Math.exp(-sampleSize / 3.5), 3);
+    sampleFactor = roundTo(1.0 - Math.exp(-sampleSize / (isV1 ? 3.5 : 3.0)), 3);
     availFactor = fallbackUsed ? 0.85 : 1.0;
-    const startClarity = supportingEvidence.recency_start_rate !== null
-      ? Math.max(supportingEvidence.recency_start_rate, 1.0 - supportingEvidence.recency_start_rate)
-      : 0.5;
-    roleClarityFactor = roundTo(0.80 + 0.20 * startClarity, 3);
+    const startClarity = Math.max(condStartProb, 1.0 - condStartProb);
+    roleClarityFactor = roundTo(0.75 + 0.25 * startClarity, 3);
     ptConfidenceVal = roundTo(sampleFactor * availFactor * roleClarityFactor, 3);
   }
 
   // 5. Expected Minutes Decomposition for Single Fixture
-  const expMinsWhenStarted = supportingEvidence.average_minutes_when_started;
-  const expMinsAsSub = supportingEvidence.average_minutes_as_substitute;
+  const startSample = supportingEvidence.starts_sample_size;
+  const subSample = supportingEvidence.substitute_appearance_sample_size;
+
+  const expMinsWhenStarted = isV1
+    ? supportingEvidence.average_minutes_when_started
+    : (startSample > 0
+        ? roundTo((startSample * supportingEvidence.average_minutes_when_started + 1.0 * priors.default_expected_mins_when_started) / (startSample + 1.0), 1)
+        : priors.default_expected_mins_when_started);
+
+  const expMinsAsSub = isV1
+    ? supportingEvidence.average_minutes_as_substitute
+    : (subSample > 0
+        ? roundTo((subSample * supportingEvidence.average_minutes_as_substitute + 1.0 * priors.default_expected_mins_as_sub) / (subSample + 1.0), 1)
+        : priors.default_expected_mins_as_sub);
 
   const startContrib = roundTo(probStart * expMinsWhenStarted, 2);
   const subProb = Math.max(0, roundTo(probAppearance - probStart, 4));
@@ -806,7 +921,7 @@ export function buildPlayerExpectedMinutes(options: {
 
   const breakdown: MinutesModelBreakdown = {
     player_id: player.id,
-    model_version: MINUTES_MODEL_VERSION,
+    model_version: activeModelVersion,
     prediction_gameweek: predGw,
     historical_cutoff_gameweek: cutoffGw,
     position_id: positionId,
@@ -819,12 +934,15 @@ export function buildPlayerExpectedMinutes(options: {
       fallback_used: fallbackUsed,
       fallback_reason: fallbackReason,
       probability_available: probAvailable,
+      provenance: override?.provenance || (player.availability_provenance || "OFFICIAL_FPL_BOOTSTRAP"),
+      override_applied: !!override,
+      quote_rationale: override?.quote_rationale || null,
     },
 
     historical_evidence: supportingEvidence,
 
     shrinkage: {
-      prior_sample_weight: priorWeight,
+      prior_sample_weight: effectivePriorWeight,
       sample_size: sampleSize,
       total_match_weight: matchWeight,
       prior_appearance_rate: priors.prior_appearance_rate,
@@ -951,7 +1069,7 @@ export function buildPlayerExpectedMinutes(options: {
 
   return {
     player_id: player.id,
-    model_version: MINUTES_MODEL_VERSION,
+    model_version: activeModelVersion,
     expected_minutes: expMinsEnvelope,
     probability_available: probAvailEnvelope,
     probability_appearance: probAppEnvelope,
@@ -968,8 +1086,9 @@ export function buildBulkExpectedMinutes(options: {
   featuresByPlayer: Record<number, CanonicalPlayerFeatures>;
   snapshot: PredictionSnapshot;
   recentHistoryByPlayer?: Record<number, Array<Record<string, any>>> | null;
+  modelVersion?: string;
 }): Record<number, PlayerMinutesModelResult> {
-  const { players, featuresByPlayer, snapshot, recentHistoryByPlayer = null } = options;
+  const { players, featuresByPlayer, snapshot, recentHistoryByPlayer = null, modelVersion = MINUTES_MODEL_VERSION_V1_1 } = options;
   const result: Record<number, PlayerMinutesModelResult> = {};
 
   for (const p of players) {
@@ -981,6 +1100,7 @@ export function buildBulkExpectedMinutes(options: {
         features: feat,
         snapshot,
         history: hist,
+        modelVersion,
       });
     }
   }

@@ -1,6 +1,6 @@
 {
   "name": "FPL Expert",
-  "description": "Fantasy Premier League analysis platform featuring custom rating algorithms, fixture analytics, squad optimizer, lineup advisor, and bench ordering.",
+  "description": "Fantasy Premier League analysis platform featuring multi-GW projections, Starting XI optimizer, bench order engine, and constrained Transfer Decision Engine v1.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

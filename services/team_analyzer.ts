@@ -2,6 +2,16 @@ import {
   numberValue,
   clamp,
 } from "./rating_engine";
+import {
+  PredictionSnapshot,
+  GameweekBoundary,
+} from "./prediction_contract";
+import {
+  DecisionEngineResult,
+  runFplDecisionEngine,
+  buildDecisionSquadFromPlayers,
+} from "./decision_engine";
+import { applyActiveGlobalOverrides } from "./availability_intelligence";
 
 export const VALID_FORMATIONS: Array<[number, number, number]> = [
   [3, 5, 2],
@@ -318,7 +328,13 @@ export function analyzeTeamSquad(
   picks: Array<Record<string, any>>,
   entry: Record<string, any>,
   gameweek: number,
-  entryHistory: Record<string, any>
+  entryHistory: Record<string, any>,
+  options?: {
+    snapshot?: PredictionSnapshot;
+    allFixtures?: Array<Record<string, any>>;
+    allTeams?: Array<Record<string, any>>;
+    playerHistories?: Record<number, Array<Record<string, any>>>;
+  }
 ): {
   summary: Record<string, any>;
   analysis: Record<string, any>;
@@ -352,9 +368,12 @@ export function analyzeTeamSquad(
     }
   }
 
+  // Phase 8: Automatically apply live availability overrides before Starting XI optimization
+  const effectiveSquadPlayers = applyActiveGlobalOverrides(squadPlayers);
+
   const groups: Array<{ name: string; position_id: number; players: Array<Record<string, any>> }> = [];
   for (const [posId, groupName] of GROUP_DEFINITIONS) {
-    const groupPlayers = squadPlayers
+    const groupPlayers = effectiveSquadPlayers
       .filter((p) => p.element_type === posId)
       .sort((a, b) => numberValue(b.expert_score) - numberValue(a.expert_score));
     groups.push({
@@ -364,17 +383,38 @@ export function analyzeTeamSquad(
     });
   }
 
-  const startingXiResult = evaluateStartingXi(squadPlayers);
+  // Legacy analysis preserved exactly
+  const startingXiResult = evaluateStartingXi(effectiveSquadPlayers);
   const startingIds = new Set(startingXiResult.players.map((p) => p.id));
 
-  const benchPlayers = squadPlayers.filter((p) => !startingIds.has(p.id));
+  const benchPlayers = effectiveSquadPlayers.filter((p) => !startingIds.has(p.id));
   const benchGk = benchPlayers.find((p) => p.element_type === 1) || null;
   const benchOutfield = benchPlayers.filter((p) => p.element_type !== 1);
   const prioritizedSubs = addBenchPriority(benchOutfield);
 
   const captaincy = recommendCaptaincy(startingXiResult.players);
-  const health = calculateSquadHealth(squadPlayers, startingXiResult.players);
-  const attention = compileAttentionList(squadPlayers);
+  const health = calculateSquadHealth(effectiveSquadPlayers, startingXiResult.players);
+  const attention = compileAttentionList(effectiveSquadPlayers);
+
+  // Phase 6A Predictive Decision Engine
+  let decisionEngineResult: DecisionEngineResult | null = null;
+  if (options?.snapshot && effectiveSquadPlayers.length === 15 && !effectiveSquadPlayers.some((p) => p.missing_data)) {
+    try {
+      const decisionSquad = buildDecisionSquadFromPlayers({
+        players: effectiveSquadPlayers,
+        snapshot: options.snapshot,
+        allFixtures: options.allFixtures,
+        allTeams: options.allTeams,
+        playerHistories: options.playerHistories,
+      });
+      decisionEngineResult = runFplDecisionEngine({
+        squad: decisionSquad,
+        snapshot: options.snapshot,
+      });
+    } catch (err) {
+      console.error("Decision engine evaluation error:", err);
+    }
+  }
 
   const summary = {
     team_name: entry.name || "My Team",
@@ -386,7 +426,7 @@ export function analyzeTeamSquad(
     squad_value: entryHistory.value ?? entry.last_deadline_value ?? null,
   };
 
-  const analysis = {
+  const analysis: Record<string, any> = {
     groups,
     starting_xi: startingXiResult,
     bench: {
@@ -396,6 +436,7 @@ export function analyzeTeamSquad(
     captaincy,
     health,
     attention,
+    decision_engine: decisionEngineResult,
   };
 
   return {

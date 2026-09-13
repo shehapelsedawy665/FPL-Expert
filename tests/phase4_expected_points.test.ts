@@ -15,6 +15,7 @@ import {
   EXPECTED_POINTS_MODEL_VERSION,
   OFFICIAL_FPL_SCORING_RULES_2026_27,
   buildPlayerExpectedPoints,
+  evaluateDefensiveContributionMatch,
   expectedSavePointsFromPoisson,
   expectedGoalsConcededDeductionFromPoisson,
   calculateFixtureModifiers,
@@ -493,4 +494,338 @@ describe("Phase 4: Official-FPL Expected Points Model v1", () => {
       expect(res1.ep.breakdown.expected_bonus_points).toBe(res2.ep.breakdown.expected_bonus_points);
     });
   });
+
+  // ==========================================================================
+  // SECTION 3: OFFICIAL 2026/27 DEFENSIVE CONTRIBUTION (DC) RULES & EVENT MODEL
+  // ==========================================================================
+  describe("3. Official 2026/27 Defensive Contribution (DC) Scoring Rules & Event Model", () => {
+    // A. DEF (Position 2): CBIT >= 10 => 2 points max per fixture. Recoveries do not count.
+    it("DEF: 9 CBIT yields 0 points", () => {
+      const res = evaluateDefensiveContributionMatch(2, {
+        clearances_blocks_interceptions: 5,
+        tackles: 4, // CBIT = 9
+        recoveries: 8, // recoveries must NOT count for DEF
+      });
+      expect(res.cbit).toBe(9);
+      expect(res.threshold).toBe(10);
+      expect(res.thresholdHit).toBe(false);
+      expect(res.pointsAwarded).toBe(0);
+    });
+
+    it("DEF: 10 CBIT yields 2 points", () => {
+      const res = evaluateDefensiveContributionMatch(2, {
+        clearances_blocks_interceptions: 6,
+        tackles: 4, // CBIT = 10
+        recoveries: 5,
+      });
+      expect(res.cbit).toBe(10);
+      expect(res.thresholdHit).toBe(true);
+      expect(res.pointsAwarded).toBe(2);
+    });
+
+    it("DEF: 20 CBIT yields 2 points maximum (capped per fixture)", () => {
+      const res = evaluateDefensiveContributionMatch(2, {
+        clearances_blocks_interceptions: 12,
+        tackles: 8, // CBIT = 20
+        recoveries: 10,
+      });
+      expect(res.cbit).toBe(20);
+      expect(res.thresholdHit).toBe(true);
+      expect(res.pointsAwarded).toBe(2);
+    });
+
+    // B. MID (Position 3): CBIRT >= 12 => 2 points max per fixture. Recoveries DO count.
+    it("MID: 11 CBIRT yields 0 points", () => {
+      const res = evaluateDefensiveContributionMatch(3, {
+        clearances_blocks_interceptions: 3,
+        tackles: 2,
+        recoveries: 6, // CBIRT = 11
+      });
+      expect(res.cbirt).toBe(11);
+      expect(res.threshold).toBe(12);
+      expect(res.thresholdHit).toBe(false);
+      expect(res.pointsAwarded).toBe(0);
+    });
+
+    it("MID: 12 CBIRT yields 2 points (recoveries count)", () => {
+      const res = evaluateDefensiveContributionMatch(3, {
+        clearances_blocks_interceptions: 3,
+        tackles: 2,
+        recoveries: 7, // CBIRT = 12
+      });
+      expect(res.cbirt).toBe(12);
+      expect(res.thresholdHit).toBe(true);
+      expect(res.pointsAwarded).toBe(2);
+    });
+
+    it("MID: 24 CBIRT yields 2 points maximum (capped per fixture)", () => {
+      const res = evaluateDefensiveContributionMatch(3, {
+        clearances_blocks_interceptions: 8,
+        tackles: 6,
+        recoveries: 10, // CBIRT = 24
+      });
+      expect(res.cbirt).toBe(24);
+      expect(res.thresholdHit).toBe(true);
+      expect(res.pointsAwarded).toBe(2);
+    });
+
+    // C. FWD (Position 4): CBIRT >= 12 => 2 points max per fixture. Recoveries DO count.
+    it("FWD: 11 CBIRT yields 0 points", () => {
+      const res = evaluateDefensiveContributionMatch(4, {
+        clearances_blocks_interceptions: 2,
+        tackles: 1,
+        recoveries: 8, // CBIRT = 11
+      });
+      expect(res.cbirt).toBe(11);
+      expect(res.thresholdHit).toBe(false);
+      expect(res.pointsAwarded).toBe(0);
+    });
+
+    it("FWD: 12 CBIRT yields 2 points", () => {
+      const res = evaluateDefensiveContributionMatch(4, {
+        clearances_blocks_interceptions: 2,
+        tackles: 2,
+        recoveries: 8, // CBIRT = 12
+      });
+      expect(res.cbirt).toBe(12);
+      expect(res.thresholdHit).toBe(true);
+      expect(res.pointsAwarded).toBe(2);
+    });
+
+    // D. GKP (Position 1): NOT_APPLICABLE / 0 direct DC points
+    it("GKP: NOT_APPLICABLE / 0 direct DC scoring even with high clearances/recoveries", () => {
+      const res = evaluateDefensiveContributionMatch(1, {
+        clearances_blocks_interceptions: 15,
+        tackles: 5,
+        recoveries: 20,
+      });
+      expect(res.thresholdHit).toBe(false);
+      expect(res.pointsAwarded).toBe(0);
+    });
+
+    // E. Recoveries semantics: count for MID/FWD but NOT DEF
+    it("verifies recoveries count toward MID/FWD CBIRT threshold but NOT toward DEF CBIT threshold", () => {
+      // DEF with 8 CBI+tackles and 10 recoveries -> CBIT = 8 (< 10) -> 0 pts
+      const defRes = evaluateDefensiveContributionMatch(2, {
+        clearances_blocks_interceptions: 5,
+        tackles: 3,
+        recoveries: 10,
+      });
+      expect(defRes.cbit).toBe(8);
+      expect(defRes.thresholdHit).toBe(false);
+      expect(defRes.pointsAwarded).toBe(0);
+
+      // MID with same numbers (5 CBI, 3 tackles, 10 recoveries) -> CBIRT = 18 (>= 12) -> 2 pts
+      const midRes = evaluateDefensiveContributionMatch(3, {
+        clearances_blocks_interceptions: 5,
+        tackles: 3,
+        recoveries: 10,
+      });
+      expect(midRes.cbirt).toBe(18);
+      expect(midRes.thresholdHit).toBe(true);
+      expect(midRes.pointsAwarded).toBe(2);
+    });
+
+    // F. Expected DC points integrated into pipeline & additive identity
+    it("integrates expected DC points into pipeline and separates from Bonus points", () => {
+      const snapshot = createSnapshot(2);
+      const fixtures = mockFixtures([{ event: 3, team_h: 1, team_a: 2, team_h_difficulty: 3 }]);
+      const pDef = mockPlayer({ id: 888, element_type: 2 });
+
+      // Defender who hit 10+ CBIT in GW1 and GW2
+      const hist = mockHistory([
+        { round: 1, minutes: 90, starts: 1, clearances_blocks_interceptions: 8, tackles: 3, bonus: 2 }, // 11 CBIT
+        { round: 2, minutes: 90, starts: 1, clearances_blocks_interceptions: 7, tackles: 4, bonus: 1 }, // 11 CBIT
+      ]);
+
+      const feat = buildPlayerPredictionFeatures({ player: pDef, snapshot, history: hist, allFixtures: fixtures });
+      const mins = buildPlayerExpectedMinutes({ player: pDef, features: feat, snapshot, history: hist });
+      const ep = buildPlayerExpectedPoints({ player: pDef, features: feat, minutesResult: mins, snapshot, history: hist, allFixtures: fixtures });
+
+      expect(ep.breakdown.shrinkage_diagnostics.sample_dc_hits).toBe(2);
+      expect(ep.breakdown.probability_defensive_contribution_points).toBeGreaterThan(0.20);
+      expect(ep.breakdown.expected_defensive_contribution_points).toBeGreaterThan(0.40);
+      expect(ep.breakdown.expected_bonus_points).toBeGreaterThan(0.10); // distinct and separate
+
+      // Verify the fixture expected points matches the full identity including DC
+      const fix = ep.breakdown.fixtures[0];
+      const identitySum = fix.expected_appearance_points +
+        fix.expected_goal_points +
+        fix.expected_assist_points +
+        fix.expected_clean_sheet_points +
+        fix.expected_save_points +
+        fix.expected_penalty_save_points +
+        fix.expected_defensive_contribution_points +
+        fix.expected_bonus_points +
+        fix.expected_goals_conceded_deduction +
+        fix.expected_penalty_miss_deduction +
+        fix.expected_yellow_card_deduction +
+        fix.expected_red_card_deduction +
+        fix.expected_own_goal_deduction;
+
+      expect(Math.abs(fix.fixture_expected_points - identitySum)).toBeLessThan(0.001);
+    });
+  });
+
+  // ==========================================================================
+  // SECTION 4: EXPECTED POINTS CONFIDENCE AUDIT & VALIDATION TESTS
+  // ==========================================================================
+  describe("4. Expected Points Confidence Audit & Validation Tests", () => {
+    // A. Player with substantial personal history vs player with zero personal history
+    it("A. Substantial personal history vs zero personal history yields differing confidence", () => {
+      const snapshot = createSnapshot(5);
+      const fixtures = mockFixtures([{ event: 6, team_h: 1, team_a: 2, team_h_difficulty: 3 }]);
+      const p = mockPlayer({ id: 101, element_type: 3, status: "a" });
+
+      // Zero history player (new signing)
+      const histZero = mockHistory([]);
+      const featZero = buildPlayerPredictionFeatures({ player: p, snapshot, history: histZero, allFixtures: fixtures });
+      const minsZero = buildPlayerExpectedMinutes({ player: p, features: featZero, snapshot, history: histZero });
+      const epZero = buildPlayerExpectedPoints({ player: p, features: featZero, minutesResult: minsZero, snapshot, history: histZero, allFixtures: fixtures });
+
+      // Substantial history player (5 matches started)
+      const hist5 = mockHistory([
+        { round: 1, minutes: 90, starts: 1, goals_scored: 1, expected_goals: "0.45" },
+        { round: 2, minutes: 90, starts: 1, goals_scored: 0, expected_goals: "0.30" },
+        { round: 3, minutes: 85, starts: 1, goals_scored: 1, expected_goals: "0.55" },
+        { round: 4, minutes: 90, starts: 1, goals_scored: 0, expected_goals: "0.25" },
+        { round: 5, minutes: 90, starts: 1, goals_scored: 2, expected_goals: "0.80" },
+      ]);
+      const feat5 = buildPlayerPredictionFeatures({ player: p, snapshot, history: hist5, allFixtures: fixtures });
+      const mins5 = buildPlayerExpectedMinutes({ player: p, features: feat5, snapshot, history: hist5 });
+      const ep5 = buildPlayerExpectedPoints({ player: p, features: feat5, minutesResult: mins5, snapshot, history: hist5, allFixtures: fixtures });
+
+      expect(epZero.expected_points_confidence.value).toBe(0.0);
+      expect(ep5.expected_points_confidence.value).toBeGreaterThan(0.50);
+      expect(Number(ep5.expected_points_confidence.value)).toBeGreaterThan(Number(epZero.expected_points_confidence.value));
+    });
+
+    // B. Changing confidence inputs does NOT change Expected Points value
+    it("B. Changing confidence inputs does NOT change Expected Points (decoupling property)", () => {
+      const snapshot = createSnapshot(2);
+      const fixtures = mockFixtures([{ event: 3, team_h: 1, team_a: 2, team_h_difficulty: 3 }]);
+      const p = mockPlayer({ id: 101, element_type: 3, status: "a" });
+      const hist = mockHistory([
+        { round: 1, minutes: 90, starts: 1, goals_scored: 1, expected_goals: "0.40", expected_assists: "0.20" },
+        { round: 2, minutes: 90, starts: 1, goals_scored: 0, expected_goals: "0.30", expected_assists: "0.10" },
+      ]);
+
+      const feat = buildPlayerPredictionFeatures({ player: p, snapshot, history: hist, allFixtures: fixtures });
+      const minsReal = buildPlayerExpectedMinutes({ player: p, features: feat, snapshot, history: hist });
+
+      // Create a cloned minutesResult with artificially altered playing_time_confidence
+      const minsAltered = {
+        ...minsReal,
+        playing_time_confidence: {
+          ...minsReal.playing_time_confidence,
+          value: 0.999, // drastically altered confidence
+        },
+      };
+
+      const epReal = buildPlayerExpectedPoints({ player: p, features: feat, minutesResult: minsReal, snapshot, history: hist, allFixtures: fixtures });
+      const epAltered = buildPlayerExpectedPoints({ player: p, features: feat, minutesResult: minsAltered, snapshot, history: hist, allFixtures: fixtures });
+
+      // Confidence changes:
+      expect(epReal.expected_points_confidence.value).not.toBe(epAltered.expected_points_confidence.value);
+      // Expected Points value remains IDENTICAL:
+      expect(epReal.expected_points_next_gameweek.value).toBe(epAltered.expected_points_next_gameweek.value);
+      expect(epReal.breakdown.expected_goals).toBe(epAltered.breakdown.expected_goals);
+      expect(epReal.breakdown.expected_assists).toBe(epAltered.breakdown.expected_assists);
+      expect(epReal.breakdown.expected_clean_sheet_points).toBe(epAltered.breakdown.expected_clean_sheet_points);
+    });
+
+    // C. Increasing valid historical evidence monotonically increases confidence
+    it("C. Increasing valid historical evidence monotonically increases confidence", () => {
+      const snapshot = createSnapshot(6);
+      const fixtures = mockFixtures([{ event: 7, team_h: 1, team_a: 2, team_h_difficulty: 3 }]);
+      const p = mockPlayer({ id: 101, element_type: 3, status: "a" });
+
+      const confidences: number[] = [];
+      const matchHistory: any[] = [];
+
+      for (let gw = 1; gw <= 6; gw++) {
+        matchHistory.push({ round: gw, minutes: 90, starts: 1, goals_scored: 0, expected_goals: "0.20" });
+        const hist = mockHistory([...matchHistory]);
+        const feat = buildPlayerPredictionFeatures({ player: p, snapshot, history: hist, allFixtures: fixtures });
+        const mins = buildPlayerExpectedMinutes({ player: p, features: feat, snapshot, history: hist });
+        const ep = buildPlayerExpectedPoints({ player: p, features: feat, minutesResult: mins, snapshot, history: hist, allFixtures: fixtures });
+        confidences.push(Number(ep.expected_points_confidence.value));
+      }
+
+      // Check strictly monotonic increase
+      for (let i = 1; i < confidences.length; i++) {
+        expect(confidences[i]).toBeGreaterThanOrEqual(confidences[i - 1]);
+      }
+      expect(confidences[5]).toBeGreaterThan(confidences[0]);
+    });
+
+    // D. Unsupported / missing components / zero sample reduce confidence appropriately
+    it("D. Zero sample or missing playing time confidence produces zero EP confidence", () => {
+      const snapshot = createSnapshot(2);
+      const fixtures = mockFixtures([{ event: 3, team_h: 1, team_a: 2, team_h_difficulty: 3 }]);
+      const p = mockPlayer({ id: 101, element_type: 3, status: "a" });
+      const histZero = mockHistory([]);
+
+      const feat = buildPlayerPredictionFeatures({ player: p, snapshot, history: histZero, allFixtures: fixtures });
+      const mins = buildPlayerExpectedMinutes({ player: p, features: feat, snapshot, history: histZero });
+      const ep = buildPlayerExpectedPoints({ player: p, features: feat, minutesResult: mins, snapshot, history: histZero, allFixtures: fixtures });
+
+      expect(ep.expected_points_confidence.value).toBe(0.0);
+      expect(mins.playing_time_confidence.validity).toBe(DataValidity.MISSING);
+    });
+
+    // E. Confidence remains bounded strictly within [0, 1]
+    it("E. Confidence remains strictly bounded within [0, 1] across all conditions", () => {
+      const snapshot = createSnapshot(38);
+      const fixtures = mockFixtures([{ event: 38, team_h: 1, team_a: 2, team_h_difficulty: 1 }]);
+      const p = mockPlayer({ id: 101, element_type: 4, status: "a" });
+
+      // Extremely large sample of 38 matches
+      const bigHist = mockHistory(
+        Array.from({ length: 38 }, (_, i) => ({ round: i + 1, minutes: 90, starts: 1, goals_scored: 1 }))
+      );
+
+      const feat = buildPlayerPredictionFeatures({ player: p, snapshot, history: bigHist, allFixtures: fixtures });
+      const mins = buildPlayerExpectedMinutes({ player: p, features: feat, snapshot, history: bigHist });
+      const ep = buildPlayerExpectedPoints({ player: p, features: feat, minutesResult: mins, snapshot, history: bigHist, allFixtures: fixtures });
+
+      const conf = Number(ep.expected_points_confidence.value);
+      expect(conf).toBeGreaterThanOrEqual(0.0);
+      expect(conf).toBeLessThanOrEqual(1.0);
+      expect(conf).toBeGreaterThan(0.70);
+    });
+
+    // F. Phase 3 playing_time_confidence is propagated correctly
+    it("F. Phase 3 playing_time_confidence is propagated directly into Phase 4 EP confidence scaling", () => {
+      const snapshot = createSnapshot(2);
+      const fixtures = mockFixtures([{ event: 3, team_h: 1, team_a: 2, team_h_difficulty: 3 }]);
+      const p = mockPlayer({ id: 101, element_type: 3, status: "a" });
+      const hist = mockHistory([
+        { round: 1, minutes: 90, starts: 1 },
+        { round: 2, minutes: 90, starts: 1 },
+      ]);
+
+      const feat = buildPlayerPredictionFeatures({ player: p, snapshot, history: hist, allFixtures: fixtures });
+      const mins = buildPlayerExpectedMinutes({ player: p, features: feat, snapshot, history: hist });
+      const ep = buildPlayerExpectedPoints({ player: p, features: feat, minutesResult: mins, snapshot, history: hist, allFixtures: fixtures });
+
+      // In mockPlayer, chance_of_playing_next_round: 100 => fallbackUsed = false => availFactor = 1.0 => ptConf = 0.435
+      // 0.435 * (0.35 + 0.65 * 0.393) = 0.435 * 0.60545 = 0.263
+      const ptConf = Number(mins.playing_time_confidence.value);
+      const sampleMatchFactor = Math.round((1.0 - Math.exp(-2 / 4.0)) * 1000) / 1000;
+      const expectedEpConf = Math.round(ptConf * (0.35 + 0.65 * sampleMatchFactor) * 1000) / 1000;
+
+      expect(ep.expected_points_confidence.value).toBe(expectedEpConf);
+
+      // Now verify with status fallback (chance_of_playing_next_round missing => fallbackUsed = true => availFactor = 0.85)
+      const pFallback = mockPlayer({ id: 102, element_type: 3, status: "a", chance_of_playing_next_round: null, chance_of_playing_this_round: null });
+      const featFb = buildPlayerPredictionFeatures({ player: pFallback, snapshot, history: hist, allFixtures: fixtures });
+      const minsFb = buildPlayerExpectedMinutes({ player: pFallback, features: featFb, snapshot, history: hist });
+      const epFb = buildPlayerExpectedPoints({ player: pFallback, features: featFb, minutesResult: minsFb, snapshot, history: hist, allFixtures: fixtures });
+      
+      const expectedFbEpConf = Math.round(Number(minsFb.playing_time_confidence.value) * (0.35 + 0.65 * sampleMatchFactor) * 1000) / 1000;
+      expect(epFb.expected_points_confidence.value).toBe(expectedFbEpConf);
+    });
+  });
 });
+

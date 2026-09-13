@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      name="description"
+      content="Live Press Room & Breaking News Feed for Fantasy Premier League."
+    />
+    <title>Live Press Room · FPL Expert</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}" />
+  </head>
+  <body>
+    <main class="players-page team-page">
+      <header class="players-header">
+        <a class="brand-link" href="{{ url_for('home') }}">FPL Expert</a>
+        <div>
+          <div class="eyebrow">PHASE 8 · LIVE AVAILABILITY INTELLIGENCE</div>
+          <h1>Live Press Room</h1>
+          <p class="page-intro">Breaking coach quotes and authoritative injury overrides before official FPL status updates.</p>
+        </div>
+        <div class="home-actions" style="margin: 0;">
+          <a class="back-link" href="{{ url_for('my_team') }}">My Team</a>
+          <a class="back-link" href="{{ url_for('players') }}">All players</a>
+        </div>
+      </header>
+
+      <div class="press-room-grid">
+        <!-- News Feed Column -->
+        <section class="team-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">BREAKING AVAILABILITY INTEL</div>
+              <h2>Live Press Feed ({{ news_feed|length }})</h2>
+            </div>
+            {% if overrides|length > 0 %}
+              <button id="clear-overrides-btn" class="secondary-link" style="padding: 0.4rem 0.8rem; font-size: 0.78rem; cursor: pointer; background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #fca5a5;">
+                Clear Overrides
+              </button>
+            {% endif %}
+          </div>
+
+          <div class="press-feed-container" id="news-feed-list">
+            {% if news_feed|length == 0 %}
+              <div class="status-panel" style="background: rgba(16, 42, 75, 0.5); border: 1px dashed rgba(148, 163, 184, 0.25); border-radius: 0.65rem; padding: 1.5rem; text-align: center;">
+                <p style="margin: 0; color: #94a3b8;">No press conference updates yet. Submit a coach quote or breaking news statement on the right to extract availability signals!</p>
+              </div>
+            {% else %}
+              {% for item in news_feed %}
+                <article class="press-feed-item">
+                  <div class="press-feed-header">
+                    <span class="press-badge-pill sentiment-{{ item.sentiment_tag|lower }}">
+                      {{ item.sentiment_tag|replace('_', ' ') }}
+                    </span>
+                    <span class="press-badge-pill" style="background: rgba(148, 163, 184, 0.15); color: #94a3b8;">
+                      {{ item.published_at|slice(0, 16)|replace('T', ' ') }}
+                    </span>
+                  </div>
+                  <h3 class="press-feed-headline">{{ item.catchy_headline }}</h3>
+                  <div class="press-feed-quote">
+                    "{{ item.quote_rationale }}"
+                  </div>
+                  <div class="press-feed-meta">
+                    <span><strong>Player:</strong> {{ item.player_name }}</span>
+                    {% if item.coach_name %}<span><strong>Coach:</strong> {{ item.coach_name }}</span>{% endif %}
+                    <span><strong>Status:</strong> {{ item.injury_status }}</span>
+                    <span><strong>Availability:</strong> {{ (item.adjusted_availability_prob * 100)|round }}%</span>
+                    <span><strong>Confidence:</strong> {{ (item.confidence * 100)|round }}%</span>
+                  </div>
+                </article>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </section>
+
+        <!-- Ingest Press Conference Column -->
+        <section class="team-section">
+          <section class="team-import-card" style="margin-bottom: 1.5rem;">
+            <div>
+              <div class="eyebrow">INTEL EXTRACTION</div>
+              <h2>Ingest Coach Statement</h2>
+              <p>Extract availability signals and update Expected Minutes overrides instantly.</p>
+            </div>
+
+            <form id="press-ingest-form" class="press-input-form" style="margin-top: 1rem;">
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-bottom: 0.6rem;">
+                <div>
+                  <label for="coach-name" style="font-size: 0.76rem; color: #94a3b8; display: block; margin-bottom: 0.2rem;">Coach / Manager</label>
+                  <input id="coach-name" type="text" placeholder="e.g. Mikel Arteta" style="width: 100%; border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 0.5rem; padding: 0.5rem; background: rgba(10, 25, 47, 0.85); color: #f8fafc; font-family: inherit;" />
+                </div>
+                <div>
+                  <label for="team-select" style="font-size: 0.76rem; color: #94a3b8; display: block; margin-bottom: 0.2rem;">Premier League Club</label>
+                  <select id="team-select" style="width: 100%; border: 1px solid rgba(148, 163, 184, 0.28); border-radius: 0.5rem; padding: 0.5rem; background: rgba(10, 25, 47, 0.85); color: #f8fafc; font-family: inherit;">
+                    {% for t in teams %}
+                      <option value="{{ t.id }}">{{ t.name }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+
+              <label for="press-quote" style="font-size: 0.76rem; color: #94a3b8; display: block; margin-bottom: 0.2rem;">Raw Press Conference Quote or Notes</label>
+              <textarea id="press-quote" placeholder="e.g. 'Saka felt something in his hamstring. He hasn't trained and won't be available this weekend.'" required></textarea>
+
+              <div class="press-actions-row">
+                <button type="submit" class="filter-button" id="submit-intel-btn">Extract Availability Intel</button>
+                <button type="button" class="secondary-link" id="sample-arteta-btn" style="cursor: pointer; font-size: 0.8rem; padding: 0.5rem 0.8rem;">Sample Arteta</button>
+                <button type="button" class="secondary-link" id="sample-pep-btn" style="cursor: pointer; font-size: 0.8rem; padding: 0.5rem 0.8rem;">Sample Pep</button>
+              </div>
+            </form>
+          </section>
+
+          <!-- Active Overrides Table -->
+          <section class="team-section" style="padding: 0;">
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">ACTIVE OVERRIDES LEDGER</div>
+                <h3>Active Player Overrides ({{ overrides|length }})</h3>
+              </div>
+            </div>
+
+            {% if overrides|length == 0 %}
+              <p style="color: #94a3b8; font-size: 0.84rem;">No active player overrides currently in the pipeline.</p>
+            {% else %}
+              <div style="display: flex; flex-direction: column; gap: 0.5rem;">
+                {% for o in overrides %}
+                  <div style="border-radius: 0.5rem; padding: 0.6rem 0.8rem; background: rgba(16, 42, 75, 0.45); border: 1px solid rgba(148, 163, 184, 0.15); display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                      <strong style="color: #ffffff; font-size: 0.88rem;">{{ o.player_name }}</strong>
+                      <span style="font-size: 0.74rem; color: #94a3b8; margin-left: 0.4rem;">{{ o.team_name }}</span>
+                      <div style="font-size: 0.74rem; color: #cbd5e1; margin-top: 0.2rem;">
+                        Status: <strong class="press-badge-pill sentiment-{{ o.sentiment_tag|lower }}" style="font-size: 0.65rem;">{{ o.status }}</strong>
+                        · Prob: {{ (o.adjusted_availability_prob * 100)|round }}%
+                      </div>
+                    </div>
+                    <button class="delete-override-btn" data-player-id="{{ o.player_id }}" style="background: none; border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; border-radius: 4px; padding: 0.25rem 0.5rem; font-size: 0.72rem; cursor: pointer;">
+                      Reset
+                    </button>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <script>
+      const sampleArteta = "Saka felt something sharp in his hamstring against Bayern. He hasn't trained all week and is definitely ruled out of tomorrow's match.";
+      const samplePep = "Erling had some minor fatigue after Madrid, but he trained normally today with the group and is fit and ready for selection.";
+
+      document.getElementById("sample-arteta-btn")?.addEventListener("click", () => {
+        document.getElementById("coach-name").value = "Mikel Arteta";
+        document.getElementById("press-quote").value = sampleArteta;
+      });
+
+      document.getElementById("sample-pep-btn")?.addEventListener("click", () => {
+        document.getElementById("coach-name").value = "Pep Guardiola";
+        document.getElementById("press-quote").value = samplePep;
+      });
+
+      document.getElementById("press-ingest-form")?.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const btn = document.getElementById("submit-intel-btn");
+        const quote = document.getElementById("press-quote").value.trim();
+        const coach = document.getElementById("coach-name").value.trim();
+        const teamId = document.getElementById("team-select").value;
+
+        if (!quote) return;
+        btn.disabled = true;
+        btn.innerText = "Extracting Signals...";
+
+        try {
+          const res = await fetch("/api/intel/press-conference", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              raw_quote: quote,
+              coach_name: coach,
+              team_id: teamId,
+              useMockFallback: true,
+            }),
+          });
+          const data = await res.json();
+          if (data.status === "ok") {
+            window.location.reload();
+          } else {
+            alert(data.error || "Failed to extract intel");
+          }
+        } catch (err) {
+          alert("Error: " + err.message);
+        } finally {
+          btn.disabled = false;
+          btn.innerText = "Extract Availability Intel";
+        }
+      });
+
+      document.getElementById("clear-overrides-btn")?.addEventListener("click", async () => {
+        if (!confirm("Clear all active availability overrides?")) return;
+        await fetch("/api/intel/overrides", { method: "DELETE" });
+        window.location.reload();
+      });
+
+      document.querySelectorAll(".delete-override-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          const pid = btn.dataset.playerId;
+          await fetch(`/api/intel/overrides/${pid}`, { method: "DELETE" });
+          window.location.reload();
+        });
+      });
+    </script>
+  </body>
+</html>

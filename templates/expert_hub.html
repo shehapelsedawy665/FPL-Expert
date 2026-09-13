@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>FPL Expert Hub & Differential Radar</title>
+    <link rel="stylesheet" href="/static/style.css" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              fplGreen: "#00ff87",
+              fplPurple: "#38003c",
+              fplCyan: "#04f5ff",
+            },
+          },
+        },
+      };
+    </script>
+  </head>
+  <body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-fplGreen selection:text-slate-950">
+    <!-- Top Navigation Header -->
+    <header id="expert-hub-header" class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <a href="/" class="flex items-center gap-2 group">
+            <span class="w-8 h-8 rounded-lg bg-gradient-to-br from-fplGreen to-emerald-500 flex items-center justify-center text-slate-950 font-black text-lg">⚡</span>
+            <span class="font-bold text-lg tracking-tight group-hover:text-fplGreen transition">FPL Analytics</span>
+          </a>
+          <span class="text-xs px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-medium">Phase 9</span>
+        </div>
+
+        <nav class="flex items-center gap-2 sm:gap-3 text-sm">
+          <a href="/" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition">Home</a>
+          <a href="/players" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition">Players</a>
+          <a href="/my-team" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition">My Team</a>
+          <a href="/press-room" class="px-3 py-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800/60 transition">Press Room</a>
+          <a href="/expert-hub" class="px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 font-semibold">Expert Hub</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
+      <!-- Title & Live Meta Banner -->
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-800/80 pb-6">
+        <div>
+          <div class="flex items-center gap-3">
+            <h1 class="text-3xl font-extrabold tracking-tight text-white flex items-center gap-2">
+              <span>🎯 Expert Hub & Transfer Advisory</span>
+            </h1>
+            <span class="text-xs px-2.5 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono">expert-advisor.v1</span>
+          </div>
+          <p class="mt-1 text-sm text-slate-400">
+            Multi-gameweek projections (Phase 6B), transfer price momentum (Phase 7), and verified press conference availability (Phase 8).
+          </p>
+        </div>
+
+        <!-- Position / Filter Selector -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-xs text-slate-400 font-medium">Position:</span>
+          <a href="/expert-hub" class="text-xs px-3 py-1.5 rounded-md font-medium transition {{ 'bg-emerald-500 text-slate-950 font-bold' if not filters.element_type else 'bg-slate-800/80 text-slate-300 hover:bg-slate-700' }}">All</a>
+          <a href="/expert-hub?element_type=1" class="text-xs px-3 py-1.5 rounded-md font-medium transition {{ 'bg-emerald-500 text-slate-950 font-bold' if filters.element_type == 1 else 'bg-slate-800/80 text-slate-300 hover:bg-slate-700' }}">GKP</a>
+          <a href="/expert-hub?element_type=2" class="text-xs px-3 py-1.5 rounded-md font-medium transition {{ 'bg-emerald-500 text-slate-950 font-bold' if filters.element_type == 2 else 'bg-slate-800/80 text-slate-300 hover:bg-slate-700' }}">DEF</a>
+          <a href="/expert-hub?element_type=3" class="text-xs px-3 py-1.5 rounded-md font-medium transition {{ 'bg-emerald-500 text-slate-950 font-bold' if filters.element_type == 3 else 'bg-slate-800/80 text-slate-300 hover:bg-slate-700' }}">MID</a>
+          <a href="/expert-hub?element_type=4" class="text-xs px-3 py-1.5 rounded-md font-medium transition {{ 'bg-emerald-500 text-slate-950 font-bold' if filters.element_type == 4 else 'bg-slate-800/80 text-slate-300 hover:bg-slate-700' }}">FWD</a>
+        </div>
+      </div>
+
+      <!-- SECTION 1: 👑 Captaincy Showdown Matrix -->
+      <section id="captaincy-showdown-section" class="bg-gradient-to-br from-slate-900 via-slate-900 to-indigo-950/40 border border-indigo-500/30 rounded-2xl p-6 shadow-xl relative overflow-hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-indigo-500/20 pb-4 mb-6">
+          <div class="flex items-center gap-3">
+            <span class="text-2xl">👑</span>
+            <div>
+              <h2 class="text-xl font-bold text-white">Captaincy Showdown Matrix — GW{{ recommendations.captain_matrix.target_gameweek }}</h2>
+              <p class="text-xs text-indigo-300/80">Mathematical captaincy optimization balancing raw expected output against appearance probability.</p>
+            </div>
+          </div>
+          <div class="text-xs px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-200 border border-indigo-500/30 max-w-md">
+            {{ recommendations.captain_matrix.verdict }}
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+          {% for cap in recommendations.captain_matrix.candidates %}
+          <div class="relative bg-slate-900/90 border {% if cap.rank == 1 %}border-amber-400/60 shadow-lg shadow-amber-500/10{% else %}border-slate-800{% endif %} rounded-xl p-5 flex flex-col justify-between">
+            <div class="absolute -top-3 right-4 px-2.5 py-0.5 rounded-full text-xs font-bold {% if cap.rank == 1 %}bg-amber-400 text-slate-950{% else %}bg-slate-800 text-slate-300 border border-slate-700{% endif %}">
+              {% if cap.rank == 1 %}👑 Top Pick{% else %}Pick #{{ cap.rank }}{% endif %}
+            </div>
+
+            <div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300">{{ cap.position }}</span>
+                <span class="text-xs text-slate-400">{{ cap.team_short_name }}</span>
+                <span class="text-xs text-slate-500">• £{{ cap.cost_in_millions }}m</span>
+              </div>
+              <a href="/player/{{ cap.player_id }}" class="text-lg font-bold text-white hover:text-fplGreen transition mt-1 block">
+                {{ cap.web_name }}
+              </a>
+              <div class="mt-3 flex items-center justify-between text-xs py-2 px-3 rounded-lg bg-slate-800/60 border border-slate-700/50">
+                <span class="text-slate-400">Opponent:</span>
+                <span class="font-semibold text-white">{{ cap.opponent_short_name }} ({% if cap.is_home %}H{% else %}A{% endif %})</span>
+                <span class="px-1.5 py-0.5 rounded text-[11px] font-bold {% if cap.fixture_difficulty <= 2 %}bg-emerald-500/20 text-emerald-400{% elif cap.fixture_difficulty == 3 %}bg-amber-500/20 text-amber-400{% else %}bg-rose-500/20 text-rose-400{% endif %}">FDR {{ cap.fixture_difficulty }}</span>
+              </div>
+            </div>
+
+            <div class="mt-5 space-y-3">
+              <div class="grid grid-cols-2 gap-2 text-center">
+                <div class="p-2 rounded-lg bg-slate-950/60 border border-slate-800">
+                  <div class="text-[10px] text-slate-400 uppercase font-medium">Base xPts</div>
+                  <div class="text-lg font-extrabold text-white">{{ cap.base_xpts }}</div>
+                </div>
+                <div class="p-2 rounded-lg bg-indigo-950/60 border border-indigo-500/30">
+                  <div class="text-[10px] text-indigo-300 uppercase font-bold">Captain Score</div>
+                  <div class="text-lg font-black text-fplGreen">{{ cap.captaincy_score }}</div>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between text-[11px] text-slate-400 px-1">
+                <span>Start Probability:</span>
+                <span class="font-mono text-slate-200">{{ (cap.probability_appearance * 100) | round }}%</span>
+              </div>
+
+              <p class="text-xs text-slate-400 leading-relaxed border-t border-slate-800/80 pt-2 italic">
+                "{{ cap.rationale }}"
+              </p>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- SECTION 2: 🎯 Top Transfer Targets (with Price Momentum) -->
+      <section id="top-targets-section" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="text-2xl">🎯</span>
+            <div>
+              <h2 class="text-xl font-bold text-white">Top Transfer Targets (Next 5 Gameweeks)</h2>
+              <p class="text-xs text-slate-400">High projected performers with secure expected minutes and positive transfer momentum.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {% for target in recommendations.top_targets %}
+          <div class="bg-slate-900 border border-slate-800 hover:border-slate-700 transition rounded-xl p-4 flex flex-col justify-between group">
+            <div>
+              <div class="flex items-center justify-between text-xs">
+                <div class="flex items-center gap-1.5">
+                  <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">{{ target.position }}</span>
+                  <span class="text-slate-400">{{ target.team_short_name }}</span>
+                </div>
+
+                {% if target.is_price_rising %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 animate-pulse">
+                  📈 Rise Alert
+                </span>
+                {% elif target.net_event_transfers > 0 %}
+                <span class="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-300 border border-slate-700">
+                  +{{ target.net_event_transfers }} net
+                </span>
+                {% endif %}
+              </div>
+
+              <div class="mt-2.5 flex items-baseline justify-between">
+                <a href="/player/{{ target.player_id }}" class="text-base font-bold text-white group-hover:text-fplGreen transition">
+                  {{ target.web_name }}
+                </a>
+                <span class="text-sm font-semibold text-slate-300">£{{ target.cost_in_millions }}m</span>
+              </div>
+
+              <div class="mt-3 grid grid-cols-2 gap-2 text-center">
+                <div class="bg-slate-950/60 rounded-lg p-2 border border-slate-800/80">
+                  <div class="text-[10px] text-slate-400 uppercase">5-GW Proj</div>
+                  <div class="text-base font-extrabold text-fplGreen">{{ target.projected_xpts }} pts</div>
+                </div>
+                <div class="bg-slate-950/60 rounded-lg p-2 border border-slate-800/80">
+                  <div class="text-[10px] text-slate-400 uppercase">Avg / GW</div>
+                  <div class="text-base font-bold text-white">{{ target.avg_xpts_per_gw }} pts</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-4 pt-3 border-t border-slate-800/80 text-xs text-slate-400">
+              <p class="line-clamp-2 leading-relaxed">{{ target.recommendation_reason }}</p>
+              <div class="mt-2 flex items-center justify-between text-[11px] text-slate-500">
+                <span>Ownership: {{ target.selected_by_percent }}%</span>
+                <span class="text-emerald-400">Status: {{ target.availability_status }}</span>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- SECTION 3: 💎 Differential Radar (<10% Ownership) -->
+      <section id="differential-radar-section" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="text-2xl">💎</span>
+            <div>
+              <h2 class="text-xl font-bold text-white">Differential Radar (Ownership &le; 10%)</h2>
+              <p class="text-xs text-slate-400">Under-the-radar explosive differentials to propel your mini-league and overall rank.</p>
+            </div>
+          </div>
+          <span class="text-xs px-2.5 py-1 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 font-medium">Cap: 10.0%</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {% for diff in recommendations.differentials %}
+          <div class="bg-slate-900/90 border border-indigo-500/20 hover:border-indigo-500/40 transition rounded-xl p-4 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">{{ diff.position }}</span>
+                <span class="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                  {{ diff.selected_by_percent }}% owned
+                </span>
+              </div>
+
+              <div class="mt-2 flex items-baseline justify-between">
+                <a href="/player/{{ diff.player_id }}" class="text-base font-bold text-white hover:text-indigo-300 transition">
+                  {{ diff.web_name }}
+                </a>
+                <span class="text-xs text-slate-400">£{{ diff.cost_in_millions }}m</span>
+              </div>
+
+              <div class="mt-3 p-2.5 rounded-lg bg-indigo-950/30 border border-indigo-500/20 flex items-center justify-between">
+                <div>
+                  <div class="text-[10px] text-indigo-300 uppercase font-semibold">Diff Score</div>
+                  <div class="text-base font-black text-indigo-200">{{ diff.differential_score }}</div>
+                </div>
+                <div class="text-right">
+                  <div class="text-[10px] text-slate-400 uppercase">5-GW xPts</div>
+                  <div class="text-base font-bold text-white">{{ diff.projected_xpts }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-400">
+              <p class="line-clamp-2 leading-relaxed">{{ diff.upside_summary }}</p>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <!-- SECTION 4: 💰 Top Value Picks (xPts per £1.0m) -->
+      <section id="value-picks-section" class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <span class="text-2xl">💰</span>
+            <div>
+              <h2 class="text-xl font-bold text-white">Top Value Picks (Cost Efficiency)</h2>
+              <p class="text-xs text-slate-400">The most points-dense assets per £1.0m spent to maximize squad budget efficiency.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+          {% for val in recommendations.value_picks %}
+          <div class="bg-slate-900 border border-slate-800 rounded-xl p-4 flex flex-col justify-between">
+            <div>
+              <div class="flex items-center justify-between text-xs">
+                <span class="px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-semibold">{{ val.position }}</span>
+                <span class="text-slate-400">{{ val.team_short_name }}</span>
+              </div>
+
+              <div class="mt-2 flex items-baseline justify-between">
+                <a href="/player/{{ val.player_id }}" class="text-base font-bold text-white hover:text-fplGreen transition">
+                  {{ val.web_name }}
+                </a>
+                <span class="text-xs text-slate-400">£{{ val.cost_in_millions }}m</span>
+              </div>
+
+              <div class="mt-3 p-2.5 rounded-lg bg-emerald-950/20 border border-emerald-500/20 flex items-center justify-between">
+                <div>
+                  <div class="text-[10px] text-emerald-400 uppercase font-semibold">Value Ratio</div>
+                  <div class="text-base font-black text-fplGreen">{{ val.value_ratio }} <span class="text-xs font-normal">pts/£m</span></div>
+                </div>
+                <div class="text-right">
+                  <div class="text-[10px] text-slate-400 uppercase">5-GW xPts</div>
+                  <div class="text-base font-bold text-white">{{ val.projected_xpts }}</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 pt-3 border-t border-slate-800 text-xs text-slate-400">
+              <p class="line-clamp-2 leading-relaxed">{{ val.analysis }}</p>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+    </main>
+
+    <footer id="expert-hub-footer" class="border-t border-slate-800/80 bg-slate-900/50 py-6 text-center text-xs text-slate-500">
+      <p>FPL Analytics Engine • Contract version {{ recommendations.version }} • Phase 9 Expert Advisory Layer</p>
+    </footer>
+  </body>
+</html>

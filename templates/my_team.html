@@ -19,7 +19,11 @@
           <h1>My Team</h1>
           <p class="page-intro">Import your current squad and inspect its live FPL outlook.</p>
         </div>
-        <a class="back-link" href="{{ url_for('players') }}">All players</a>
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+          <a class="back-link" href="{{ url_for('expert_hub') }}">🎯 Expert Hub</a>
+          <a class="back-link" href="{{ url_for('press_room') }}">Live Press Room</a>
+          <a class="back-link" href="{{ url_for('players') }}">All players</a>
+        </div>
       </header>
 
       <section class="team-import-card">
@@ -80,6 +84,40 @@
           </div>
         </section>
 
+        {% if news_feed and news_feed|length > 0 %}
+        <!-- Phase 8 Live Press Room Breaking News Feed -->
+        <section class="team-section" style="margin-bottom: 2rem;">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">LIVE PRESS ROOM & BREAKING INTEL</div>
+              <h2>Latest Availability News ({{ news_feed|length }})</h2>
+              <p class="section-subtitle">Real-time quotes extracted from manager press conferences before official FPL price/flag updates.</p>
+            </div>
+            <a class="secondary-link" href="{{ url_for('press_room') }}" style="padding: 0.45rem 0.85rem; font-size: 0.8rem;">Full Press Room &rarr;</a>
+          </div>
+          <div class="press-feed-container">
+            {% for item in news_feed %}
+              <article class="press-feed-item">
+                <div class="press-feed-header">
+                  <span class="press-badge-pill sentiment-{{ item.sentiment_tag|lower }}">
+                    {{ item.sentiment_tag|replace('_', ' ') }}
+                  </span>
+                  <span style="font-size: 0.72rem; color: #94a3b8;">{{ item.published_at|slice(0, 16)|replace('T', ' ') }}</span>
+                </div>
+                <h3 class="press-feed-headline">{{ item.catchy_headline }}</h3>
+                <p class="press-feed-quote">"{{ item.quote_rationale }}"</p>
+                <div class="press-feed-meta">
+                  <span><strong>Player:</strong> {{ item.player_name }}</span>
+                  {% if item.coach_name %}<span><strong>Coach:</strong> {{ item.coach_name }}</span>{% endif %}
+                  <span><strong>Status:</strong> {{ item.injury_status }}</span>
+                  <span><strong>Availability:</strong> {{ (item.adjusted_availability_prob * 100)|round }}%</span>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        </section>
+        {% endif %}
+
         <section class="team-section">
           <div class="section-heading">
             <div>
@@ -110,6 +148,11 @@
                           </div>
                           <strong class="team-player-price">{{ player.now_cost|price }}</strong>
                         </div>
+                        {% if player.availability_override %}
+                          <div class="live-intel-badge sentiment-{{ player.availability_override.sentiment_tag|lower }}" title="{{ player.availability_override.quote_rationale }}">
+                            <span>⚡ {{ player.availability_override.catchy_headline or (player.availability_override.status ~ ': ' ~ player.availability_override.quote_rationale) }}</span>
+                          </div>
+                        {% endif %}
                         <div class="team-score-strip">
                           <div><span>Expert</span><strong>{{ player.expert_score|decimal(1) }}</strong></div>
                           <div><span>Confidence</span><strong class="confidence-{{ player.data_confidence|lower }}">{{ player.data_confidence|display }}</strong></div>
@@ -160,10 +203,132 @@
           </div>
         </section>
 
+        {% if analysis.decision_engine %}
+        <!-- Phase 6A Predictive Decision Engine Recommendation -->
+        <section class="team-section recommendation-section predictive-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">PREDICTIVE DECISION ENGINE (PHASE 6A)</div>
+              <h2>Optimal Starting XI</h2>
+              <p class="section-subtitle">Optimized on Expected Points (xPts) consuming Phase 3.1 Expected Minutes and Phase 4 Expected Points.</p>
+            </div>
+            <div class="formation-badge">
+              <span>Optimal formation</span>
+              <strong>{{ analysis.decision_engine.recommended_formation_label }}</strong>
+              <small>{{ analysis.decision_engine.starting_xi_total_xpts|decimal(2) }} total xPts (+{{ analysis.decision_engine.formation_margin|decimal(2) }} vs {{ analysis.decision_engine.runner_up_formation_label }})</small>
+            </div>
+          </div>
+          <div class="recommendation-list">
+            {% for player in analysis.decision_engine.starting_xi %}
+              <div class="recommendation-row">
+                <span class="recommendation-position">{{ player.position_short_name|display }}</span>
+                <div class="player-name-cell">
+                  <a href="{{ url_for('player_detail', player_id=player.id) }}">{{ player.web_name|display }}</a>
+                  <small>{{ player.team_short_name|display }} · Exp Mins: {{ player.expected_minutes|decimal(0) }} · P(start): {{ (player.probability_start * 100)|decimal(0) }}% · P(app): {{ (player.probability_appearance * 100)|decimal(0) }}%</small>
+                </div>
+                <div class="xpts-cell">
+                  <span>xPts</span>
+                  <strong>{{ player.decision_expected_points|decimal(2) }}</strong>
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+
+        <section class="team-section split-analysis">
+          <div>
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">PREDICTIVE BENCH</div>
+                <h2>Optimal Bench Order</h2>
+                <small>Probability-weighted replacement utility: {{ analysis.decision_engine.best_bench_utility|decimal(3) }}</small>
+              </div>
+            </div>
+            <div class="recommendation-list">
+              {% if analysis.decision_engine.bench_goalkeeper %}
+                <div class="recommendation-row">
+                  <span class="recommendation-position">GK</span>
+                  <div class="player-name-cell">
+                    <strong>{{ analysis.decision_engine.bench_goalkeeper.web_name|display }}</strong>
+                    <small>Reserve GK · {{ analysis.decision_engine.bench_goalkeeper.decision_expected_points|decimal(2) }} xPts</small>
+                  </div>
+                  <strong>—</strong>
+                </div>
+              {% endif %}
+              {% for player in analysis.decision_engine.ordered_outfield_bench %}
+                <div class="recommendation-row bench-priority-row">
+                  <span class="recommendation-position">{{ loop.index }}SUB</span>
+                  <div class="bench-priority-main">
+                    <strong class="bench-player-name">{{ player.web_name|display }}</strong>
+                    <small>{{ player.position_short_name|display }} · {{ player.team_short_name|display }}</small>
+                  </div>
+                  <div class="bench-priority-score">
+                    <span>xPts</span>
+                    <strong>{{ player.decision_expected_points|decimal(2) }}</strong>
+                  </div>
+                  <div class="bench-priority-meta">
+                    <span>Mins {{ player.expected_minutes|decimal(0) }}</span>
+                    <span>P(app) {{ (player.probability_appearance * 100)|decimal(0) }}%</span>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+          <div>
+            <div class="section-heading">
+              <div>
+                <div class="eyebrow">PREDICTIVE CAPTAINCY</div>
+                <h2>Captain & Vice Captain</h2>
+                <small>Joint expected captaincy bonus: {{ analysis.decision_engine.captaincy_bonus|decimal(2) }} pts</small>
+              </div>
+            </div>
+            <div class="captain-card">
+              <div>
+                <span>Captain</span>
+                <strong>{{ analysis.decision_engine.captain.web_name|display }}</strong>
+                <p>{{ analysis.decision_engine.captain.decision_expected_points|decimal(2) }} unconditional xPts (P(app)={{ (analysis.decision_engine.captain.probability_appearance * 100)|decimal(0) }}%)</p>
+              </div>
+              <div>
+                <span>Vice captain</span>
+                <strong>{{ analysis.decision_engine.vice_captain.web_name|display }}</strong>
+                <p>{{ analysis.decision_engine.vice_captain.decision_expected_points|decimal(2) }} unconditional xPts (P(app)={{ (analysis.decision_engine.vice_captain.probability_appearance * 100)|decimal(0) }}%) · Active hedge if Captain DNP</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- Legacy Comparison Section -->
+        <section class="team-section legacy-comparison-section">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">DIAGNOSTICS & COMPARISON</div>
+              <h2>Predictive (Phase 6A) vs Legacy Expert Score</h2>
+            </div>
+            <div class="formation-badge">
+              <span>Legacy Formation</span>
+              <strong>{{ analysis.decision_engine.legacy_comparison.legacy_formation }}</strong>
+              <small>Delta: {{ "+ " if analysis.decision_engine.legacy_comparison.xpts_difference_predictive_vs_legacy >= 0 else "" }}{{ analysis.decision_engine.legacy_comparison.xpts_difference_predictive_vs_legacy|decimal(2) }} xPts</small>
+            </div>
+          </div>
+          {% if analysis.decision_engine.legacy_comparison.players_changed|length > 0 %}
+            <div class="attention-list">
+              {% for change in analysis.decision_engine.legacy_comparison.players_changed %}
+                <div class="attention-row">
+                  <strong>{{ change.web_name|display }}</strong>
+                  <span>{{ change.reason }}</span>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p style="padding: 1rem 0; color: var(--text-muted, #666);">Predictive optimizer and legacy Expert Score select the identical Starting XI.</p>
+          {% endif %}
+        </section>
+        {% else %}
+        <!-- Fallback Legacy Lineup Analysis -->
         <section class="team-section recommendation-section">
           <div class="section-heading">
             <div>
-              <div class="eyebrow">LINEUP ANALYSIS</div>
+              <div class="eyebrow">LINEUP ANALYSIS (LEGACY)</div>
               <h2>Recommended Starting XI</h2>
             </div>
             <div class="formation-badge">
@@ -226,6 +391,7 @@
             </div>
           </div>
         </section>
+        {% endif %}
 
         {% if analysis.attention %}
           <section class="team-section attention-section">

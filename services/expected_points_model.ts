@@ -45,6 +45,9 @@ export interface ScoringRuleSet {
   own_goal: number;
   max_bonus_per_match: number;
   defensive_contribution_positions: number[]; // Outfield positions 2, 3, 4
+  defensive_contribution_points_per_threshold: number; // +2 FPL points
+  defensive_contribution_def_threshold: number; // 10+ CBIT for DEF
+  defensive_contribution_mid_fwd_threshold: number; // 12+ CBIRT for MID & FWD
 }
 
 export const OFFICIAL_FPL_SCORING_RULES_2026_27: ScoringRuleSet = {
@@ -76,7 +79,73 @@ export const OFFICIAL_FPL_SCORING_RULES_2026_27: ScoringRuleSet = {
   own_goal: -2,
   max_bonus_per_match: 3,
   defensive_contribution_positions: [2, 3, 4],
+  defensive_contribution_points_per_threshold: 2, // +2 standalone Fantasy points
+  defensive_contribution_def_threshold: 10, // 10+ CBIT
+  defensive_contribution_mid_fwd_threshold: 12, // 12+ CBIRT
 };
+
+/**
+ * Evaluates official 2026/27 Defensive Contribution points for a single match row:
+ * - DEF (Pos 2): 10+ CBIT (Clearances, Blocks, Interceptions + Tackles) = +2 pts (max 2 pts/fixture). Recoveries do NOT count.
+ * - MID/FWD (Pos 3 & 4): 12+ CBIRT (CBI + Tackles + Recoveries) = +2 pts (max 2 pts/fixture). Recoveries DO count.
+ * - GKP (Pos 1): NOT_APPLICABLE / 0 pts.
+ */
+export function evaluateDefensiveContributionMatch(
+  positionId: number,
+  matchStats: {
+    clearances_blocks_interceptions?: number;
+    tackles?: number;
+    recoveries?: number;
+    defensive_contribution?: number;
+  },
+  rules: ScoringRuleSet = OFFICIAL_FPL_SCORING_RULES_2026_27
+): {
+  cbit: number;
+  cbirt: number;
+  threshold: number;
+  thresholdHit: boolean;
+  pointsAwarded: number;
+} {
+  const cbi = Number(matchStats.clearances_blocks_interceptions) || 0;
+  const tackles = Number(matchStats.tackles) || 0;
+  const recoveries = Number(matchStats.recoveries) || 0;
+
+  const cbit = cbi + tackles;
+  const cbirt = cbi + tackles + recoveries;
+
+  if (positionId === 2) {
+    // Defender: 10+ CBIT
+    const threshold = rules.defensive_contribution_def_threshold;
+    const thresholdHit = cbit >= threshold;
+    return {
+      cbit,
+      cbirt,
+      threshold,
+      thresholdHit,
+      pointsAwarded: thresholdHit ? rules.defensive_contribution_points_per_threshold : 0,
+    };
+  } else if (positionId === 3 || positionId === 4) {
+    // Midfielder or Forward: 12+ CBIRT
+    const threshold = rules.defensive_contribution_mid_fwd_threshold;
+    const thresholdHit = cbirt >= threshold;
+    return {
+      cbit,
+      cbirt,
+      threshold,
+      thresholdHit,
+      pointsAwarded: thresholdHit ? rules.defensive_contribution_points_per_threshold : 0,
+    };
+  } else {
+    // Goalkeeper or other: Not applicable / 0 direct points
+    return {
+      cbit,
+      cbirt,
+      threshold: 0,
+      thresholdHit: false,
+      pointsAwarded: 0,
+    };
+  }
+}
 
 // ============================================================================
 // 2. MODEL INTERFACES & BREAKDOWNS
@@ -182,6 +251,10 @@ export interface ExpectedPointsBreakdown {
     raw_xa_per90: number;
     prior_xa_per90: number;
     shrunk_xa_per90: number;
+    sample_dc_hits: number;
+    raw_dc_rate: number;
+    prior_dc_rate: number;
+    shrunk_dc_rate: number;
     prior_sample_weight: number;
   };
 
@@ -242,7 +315,7 @@ export const POSITION_EVENT_PRIORS: Record<number, PositionPriors> = {
     prior_red_per90: 0.006,
     prior_own_goal_per90: 0.006,
     prior_bonus_per_match: 0.18,
-    prior_def_contrib_rate: 0.0,
+    prior_def_contrib_rate: 0.08,
     prior_sample_weight_matches: 4.0,
   },
   3: { // MID
@@ -253,7 +326,7 @@ export const POSITION_EVENT_PRIORS: Record<number, PositionPriors> = {
     prior_red_per90: 0.005,
     prior_own_goal_per90: 0.002,
     prior_bonus_per_match: 0.22,
-    prior_def_contrib_rate: 0.0,
+    prior_def_contrib_rate: 0.05,
     prior_sample_weight_matches: 4.0,
   },
   4: { // FWD
@@ -264,7 +337,7 @@ export const POSITION_EVENT_PRIORS: Record<number, PositionPriors> = {
     prior_red_per90: 0.004,
     prior_own_goal_per90: 0.001,
     prior_bonus_per_match: 0.28,
-    prior_def_contrib_rate: 0.0,
+    prior_def_contrib_rate: 0.01,
     prior_sample_weight_matches: 4.0,
   },
 };
@@ -418,6 +491,7 @@ export function buildPlayerExpectedPoints(options: {
   let sampleOwnGoals = 0;
   let samplePensSaved = 0;
   let samplePensMissed = 0;
+  let sampleDcHits = 0;
 
   for (const h of safeHistory) {
     const mins = Number(h.minutes) || 0;
@@ -437,6 +511,12 @@ export function buildPlayerExpectedPoints(options: {
     sampleOwnGoals += Number(h.own_goals) || 0;
     samplePensSaved += Number(h.penalties_saved) || 0;
     samplePensMissed += Number(h.penalties_missed) || 0;
+
+    // Defensive Contribution evaluation (DEF: 10+ CBIT, MID/FWD: 12+ CBIRT, GKP: 0)
+    const dcEval = evaluateDefensiveContributionMatch(positionId, h, scoringRules);
+    if (dcEval.thresholdHit) {
+      sampleDcHits += 1;
+    }
   }
 
   const sampleMatches = safeHistory.length;
@@ -488,14 +568,23 @@ export function buildPlayerExpectedPoints(options: {
     4
   );
 
-  // 6. Bonus Points Base Rate Shrinkage
+  // 6. Defensive Contribution Base Rate Shrinkage (2026/27 Standalone +2 pts)
+  const rawDcRate = sampleMatches > 0 ? sampleDcHits / sampleMatches : priors.prior_def_contrib_rate;
+  const shrunkDcRate = positionId === 1
+    ? 0.0
+    : roundTo(
+        (sampleMatches * rawDcRate + priorWeight * priors.prior_def_contrib_rate) / (sampleMatches + priorWeight),
+        4
+      );
+
+  // 7. Bonus Points Base Rate Shrinkage
   const rawBonusPerMatch = sampleMatches > 0 ? sampleBonus / sampleMatches : priors.prior_bonus_per_match;
   const shrunkBonusBase = roundTo(
     (sampleMatches * rawBonusPerMatch + priorWeight * priors.prior_bonus_per_match) / (sampleMatches + priorWeight),
     4
   );
 
-  // 7. Cards / Own Goals Shrinkage
+  // 8. Cards / Own Goals Shrinkage
   const rawYellowPer90 = sample90s > 0 ? sampleYellows / sample90s : priors.prior_yellow_per90;
   const shrunkYellowPer90 = roundTo(
     (sample90s * rawYellowPer90 + 6.0 * priors.prior_yellow_per90) / (sample90s + 6.0),
@@ -633,10 +722,19 @@ export function buildPlayerExpectedPoints(options: {
       }
 
       // G. Defensive Contribution Points (2026/27)
-      // Audited API fields: `defensive_contribution`, `clearances_blocks_interceptions`, `tackles`, `recoveries`.
-      // In standard 2026/27 FPL scoring, defensive actions feed BPS rather than a standalone direct FPL points category.
-      const fixProbDefContrib = 0.0;
-      const fixExpDefContribPoints = 0.0;
+      // Official rule: DEF (10+ CBIT) = +2 pts; MID/FWD (12+ CBIRT) = +2 pts (max 2 pts/fixture). GKP = 0 pts.
+      let fixProbDefContrib = 0.0;
+      let fixExpDefContribPoints = 0.0;
+      if (scoringRules.defensive_contribution_positions.includes(positionId)) {
+        fixProbDefContrib = roundTo(
+          Math.min(0.75, shrunkDcRate * (fixExpMins / 90.0) * defenseMultiplier),
+          4
+        );
+        fixExpDefContribPoints = roundTo(
+          fixProbDefContrib * scoringRules.defensive_contribution_points_per_threshold,
+          4
+        );
+      }
 
       // H. Bonus Points Expectation
       // Derived from shrunk base rate, scaled by match playing time and event expectations
@@ -861,12 +959,14 @@ export function buildPlayerExpectedPoints(options: {
       raw_xa_per90: rawXaPer90,
       prior_xa_per90: priors.prior_xa_per90,
       shrunk_xa_per90: shrunkXaPer90,
+      sample_dc_hits: sampleDcHits,
+      raw_dc_rate: rawDcRate,
+      prior_dc_rate: priors.prior_def_contrib_rate,
+      shrunk_dc_rate: shrunkDcRate,
       prior_sample_weight: priorWeight,
     },
 
-    unsupported_components: {
-      defensive_contribution_direct_points: "zero_expected_by_v1_policy: Official FPL data tracks CBI and tackles for BPS; direct outfield DC points not awarded in standard 2026/27 rules.",
-    },
+    unsupported_components: {},
 
     fixtures: fixtureBreakdowns,
     expected_points_next_gameweek: gwTotalExpectedPoints,
