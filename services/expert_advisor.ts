@@ -25,7 +25,7 @@ import {
   fetchBootstrapData,
   fetchFixtures,
 } from "./fpl_service.js";
-import { PredictionSnapshot } from "./prediction_contract.js";
+import { PredictionSnapshot, makePredictionSnapshot } from "./prediction_contract.js";
 
 export const EXPERT_ADVISOR_VERSION = "expert-advisor.v1";
 
@@ -267,19 +267,19 @@ export function evaluatePlayersForExpert(
 
     const gw1Breakdown = gw1Fixture?.breakdown;
     const cleanSheetPotential = gw1Breakdown
-      ? roundTo(gw1Breakdown.clean_sheet_points, 2)
+      ? roundTo(gw1Breakdown.expected_clean_sheet_points, 2)
       : isDefenderOrGk
       ? roundTo(gw1?.expected_points * 0.35, 2)
       : 0.0;
 
     const scoringPotential = gw1Breakdown
-      ? roundTo((gw1Breakdown.goals_points || 0) + (gw1Breakdown.assists_points || 0), 2)
+      ? roundTo((gw1Breakdown.expected_goal_points || 0) + (gw1Breakdown.expected_assist_points || 0), 2)
       : isAttacker
       ? roundTo(gw1?.expected_points * 0.65, 2)
       : roundTo(gw1?.expected_points * 0.15, 2);
 
     // Predict price change
-    const pricePrediction = predictPlayerPriceChange(p, totalManagers);
+    const pricePrediction = predictPlayerPriceChange(p, { totalManagers });
 
     evaluations.push({
       rawPlayer: p,
@@ -646,10 +646,10 @@ export async function getExpertRecommendations(
   const snapshot =
     options.snapshot ||
     bootstrap.snapshot ||
-    new PredictionSnapshot({
-      historical_cutoff_gameweek: null,
-      prediction_gameweek: bootstrap.gameweek_boundary?.next_gameweek || 1,
-    });
+    makePredictionSnapshot(
+      `snap_expert_gw${bootstrap.gameweek_boundary?.prediction_gameweek ?? 1}`,
+      bootstrap.events || []
+    );
 
   // Evaluate all players with overrides and multi-gameweek models
   const evaluations = evaluatePlayersForExpert(

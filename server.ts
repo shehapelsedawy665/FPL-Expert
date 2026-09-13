@@ -71,11 +71,11 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Configure static file serving
-const staticDir = path.join(__dirname, "static");
+const staticDir = path.join(process.cwd(), "static");
 app.use("/static", express.static(staticDir));
 
 // Configure Nunjucks view engine
-const templatesDir = path.join(__dirname, "templates");
+const templatesDir = path.join(process.cwd(), "templates");
 const env = nunjucks.configure(templatesDir, {
   autoescape: true,
   express: app,
